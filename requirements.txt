@@ -1,0 +1,31 @@
+# Core Dependencies
+python-dotenv==1.0.0  # For environment configuration
+pydantic==2.5.2      # For data validation
+cryptography==41.0.7  # For data encryption
+
+# OS Integration
+psutil==5.9.6        # Cross-platform system monitoring
+pywin32==306; sys_platform == 'win32'  # Windows-specific functionality
+
+# Activity Monitoring
+keyboard==0.13.5     # Keyboard event monitoring
+mouse==0.7.1         # Mouse event monitoring
+
+# Storage
+tinydb==4.8.0        # Lightweight document database
+sqlalchemy==2.0.23   # SQL toolkit and ORM
+
+# Machine Learning
+scikit-learn==1.3.2  # Machine learning library
+joblib==1.3.2        # For model persistence
+
+# Testing
+pytest==7.4.3        # Testing framework
+pytest-cov==4.1.0    # Test coverage
+pytest-mock==3.12.0  # Mocking functionality
+
+# Development Tools
+black==23.11.0       # Code formatting
+isort==5.12.0        # Import sorting
+flake8==6.1.0        # Code linting
+mypy==1.7.1          # Static type checking

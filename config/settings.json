@@ -1,0 +1,24 @@
+{
+  "session": {
+    "inactivity_timeout": 45,
+    "auto_start": false
+  },
+  "notifications": {
+    "show_productivity_alerts": true,
+    "show_suggestions": true,
+    "duration": 5
+  },
+  "privacy": {
+    "data_retention_days": 30,
+    "collect_app_usage": true,
+    "collect_window_titles": false
+  },
+  "analytics": {
+    "productivity_threshold": 70,
+    "analysis_window_days": 7
+  },
+  "ml": {
+    "enable_predictions": true,
+    "prediction_confidence": 80
+  }
+}
