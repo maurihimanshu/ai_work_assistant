@@ -7,7 +7,17 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
-from PyQt6.QtCore import Qt, QTimer, pyqtSlot, QSortFilterProxyModel, QAbstractTableModel, pyqtSignal, QSettings, QThread, QModelIndex
+from PyQt6.QtCore import (
+    Qt,
+    QTimer,
+    pyqtSlot,
+    QSortFilterProxyModel,
+    QAbstractTableModel,
+    pyqtSignal,
+    QSettings,
+    QThread,
+    QModelIndex,
+)
 from PyQt6.QtGui import QColor, QPainter, QStandardItemModel, QStandardItem
 from PyQt6.QtWidgets import (
     QComboBox,
@@ -58,11 +68,14 @@ class LogHandler(logging.Handler):
     def __init__(self, callback):
         super().__init__()
         self.callback = callback
-        self.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+        self.setFormatter(
+            logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        )
 
     def emit(self, record):
         msg = self.format(record)
         self.callback(msg, record.levelno)
+
 
 class ActivityTableModel(QAbstractTableModel):
     """Model for activity data table with sorting support."""
@@ -107,7 +120,10 @@ class ActivityTableModel(QAbstractTableModel):
         return None
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
-        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
+        if (
+            orientation == Qt.Orientation.Horizontal
+            and role == Qt.ItemDataRole.DisplayRole
+        ):
             return self.headers[section]
         return None
 
@@ -121,17 +137,19 @@ class ActivityTableModel(QAbstractTableModel):
             if column == 0:  # Time
                 self.activities.sort(
                     key=lambda x: x.get("time", datetime.min),
-                    reverse=(order == Qt.SortOrder.DescendingOrder)
+                    reverse=(order == Qt.SortOrder.DescendingOrder),
                 )
             elif column == 3:  # Duration
                 self.activities.sort(
                     key=lambda x: float(x.get("duration", 0)),
-                    reverse=(order == Qt.SortOrder.DescendingOrder)
+                    reverse=(order == Qt.SortOrder.DescendingOrder),
                 )
             else:  # Other columns
                 self.activities.sort(
-                    key=lambda x: str(self.data(self.index(0, column), Qt.ItemDataRole.DisplayRole)).lower(),
-                    reverse=(order == Qt.SortOrder.DescendingOrder)
+                    key=lambda x: str(
+                        self.data(self.index(0, column), Qt.ItemDataRole.DisplayRole)
+                    ).lower(),
+                    reverse=(order == Qt.SortOrder.DescendingOrder),
                 )
 
             self.layoutChanged.emit()
@@ -162,8 +180,7 @@ class ActivityTableModel(QAbstractTableModel):
             else:
                 self.activities = activities
                 self.dataChanged.emit(
-                    self.index(0, 0),
-                    self.index(new_count - 1, self.columnCount() - 1)
+                    self.index(0, 0), self.index(new_count - 1, self.columnCount() - 1)
                 )
 
             # Re-sort if needed
@@ -176,6 +193,7 @@ class ActivityTableModel(QAbstractTableModel):
             self.beginResetModel()
             self.activities = activities
             self.endResetModel()
+
 
 class UpdateWorker(QThread):
     """Worker thread for async data updates."""
@@ -207,6 +225,7 @@ class UpdateWorker(QThread):
             logger.error(f"Error in update worker: {e}", exc_info=True)
             self.error.emit(str(e))
 
+
 class Dashboard(QMainWindow):
     """Analytics dashboard window."""
 
@@ -220,7 +239,11 @@ class Dashboard(QMainWindow):
         """Update all dashboard data asynchronously."""
         try:
             # Don't start new update if one is already running
-            if hasattr(self, 'update_worker') and self.update_worker and self.update_worker.isRunning():
+            if (
+                hasattr(self, "update_worker")
+                and self.update_worker
+                and self.update_worker.isRunning()
+            ):
                 logger.debug("Update already in progress, skipping")
                 return
 
@@ -229,12 +252,13 @@ class Dashboard(QMainWindow):
 
             # Get time range for analytics
             start_time, end_time = self._get_time_range()
-            logger.info(f"Fetching analytics report for time window: {end_time - start_time}")
+            logger.info(
+                f"Fetching analytics report for time window: {end_time - start_time}"
+            )
 
             # Create and start worker
             self.update_worker = UpdateWorker(
-                self.analytics_service,
-                end_time - start_time
+                self.analytics_service, end_time - start_time
             )
             self.update_worker.finished.connect(self._handle_update_finished)
             self.update_worker.error.connect(self._handle_update_error)
@@ -319,25 +343,29 @@ class Dashboard(QMainWindow):
         """Load settings from QSettings."""
         try:
             # Load each setting with proper type conversion
-            self.default_settings["session_timeout"] = int(self.settings.value(
-                "session_timeout", 
-                self.default_settings["session_timeout"],
-                type=int
-            ))
-            self.default_settings["productivity_threshold"] = float(self.settings.value(
-                "productivity_threshold", 
-                self.default_settings["productivity_threshold"],
-                type=float
-            ))
-            self.default_settings["notification_interval"] = int(self.settings.value(
-                "notification_interval", 
-                self.default_settings["notification_interval"],
-                type=int
-            ))
+            self.default_settings["session_timeout"] = int(
+                self.settings.value(
+                    "session_timeout",
+                    self.default_settings["session_timeout"],
+                    type=int,
+                )
+            )
+            self.default_settings["productivity_threshold"] = float(
+                self.settings.value(
+                    "productivity_threshold",
+                    self.default_settings["productivity_threshold"],
+                    type=float,
+                )
+            )
+            self.default_settings["notification_interval"] = int(
+                self.settings.value(
+                    "notification_interval",
+                    self.default_settings["notification_interval"],
+                    type=int,
+                )
+            )
             self.default_settings["dark_mode"] = self.settings.value(
-                "dark_mode", 
-                self.default_settings["dark_mode"],
-                type=bool
+                "dark_mode", self.default_settings["dark_mode"], type=bool
             )
 
             # Apply theme
@@ -391,7 +419,9 @@ class Dashboard(QMainWindow):
 
             # Create tab widget
             tab_widget = QTabWidget()
-            tab_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            tab_widget.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+            )
             main_layout.addWidget(tab_widget)
 
             # Overview tab
@@ -405,7 +435,9 @@ class Dashboard(QMainWindow):
 
             # Add session controls
             session_group = QGroupBox("Session Control")
-            session_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
+            session_group.setSizePolicy(
+                QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum
+            )
             session_layout = QGridLayout()
             self._create_session_widget(session_layout)
             session_group.setLayout(session_layout)
@@ -413,7 +445,9 @@ class Dashboard(QMainWindow):
 
             # Add settings
             settings_group = QGroupBox("Settings")
-            settings_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
+            settings_group.setSizePolicy(
+                QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum
+            )
             settings_layout = QGridLayout()
             self._create_settings_widget(settings_layout)
             settings_group.setLayout(settings_layout)
@@ -421,7 +455,9 @@ class Dashboard(QMainWindow):
 
             # Add time period selector
             period_group = QGroupBox("Time Period")
-            period_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
+            period_group.setSizePolicy(
+                QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum
+            )
             period_layout = QHBoxLayout()
             self.period_combo = QComboBox()
             self.period_combo.addItems(["Today", "Last 7 Days", "Last 30 Days"])
@@ -436,7 +472,9 @@ class Dashboard(QMainWindow):
             # Create scrollable area for overview content
             scroll_area = QScrollArea()
             scroll_area.setWidgetResizable(True)
-            scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            scroll_area.setHorizontalScrollBarPolicy(
+                Qt.ScrollBarPolicy.ScrollBarAsNeeded
+            )
             scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
             scroll_widget = QWidget()
             scroll_layout = QVBoxLayout()
@@ -526,7 +564,13 @@ class Dashboard(QMainWindow):
             timeout_label = QLabel("Session Timeout (minutes):")
             self.timeout_spin = QSpinBox()
             self.timeout_spin.setRange(1, 120)
-            self.timeout_spin.setValue(int(self.settings.value("session_timeout", self.default_settings["session_timeout"])))
+            self.timeout_spin.setValue(
+                int(
+                    self.settings.value(
+                        "session_timeout", self.default_settings["session_timeout"]
+                    )
+                )
+            )
             layout.addWidget(timeout_label, 0, 0)
             layout.addWidget(self.timeout_spin, 0, 1)
 
@@ -535,7 +579,14 @@ class Dashboard(QMainWindow):
             self.threshold_spin = QDoubleSpinBox()
             self.threshold_spin.setRange(0.1, 1.0)
             self.threshold_spin.setSingleStep(0.1)
-            self.threshold_spin.setValue(float(self.settings.value("productivity_threshold", self.default_settings["productivity_threshold"])))
+            self.threshold_spin.setValue(
+                float(
+                    self.settings.value(
+                        "productivity_threshold",
+                        self.default_settings["productivity_threshold"],
+                    )
+                )
+            )
             layout.addWidget(threshold_label, 1, 0)
             layout.addWidget(self.threshold_spin, 1, 1)
 
@@ -543,14 +594,25 @@ class Dashboard(QMainWindow):
             interval_label = QLabel("Notification Interval (seconds):")
             self.interval_spin = QSpinBox()
             self.interval_spin.setRange(30, 3600)
-            self.interval_spin.setValue(int(self.settings.value("notification_interval", self.default_settings["notification_interval"])))
+            self.interval_spin.setValue(
+                int(
+                    self.settings.value(
+                        "notification_interval",
+                        self.default_settings["notification_interval"],
+                    )
+                )
+            )
             layout.addWidget(interval_label, 2, 0)
             layout.addWidget(self.interval_spin, 2, 1)
 
             # Dark mode
             dark_mode_label = QLabel("Dark Mode:")
             self.dark_mode_check = QCheckBox()
-            self.dark_mode_check.setChecked(self.settings.value("dark_mode", self.default_settings["dark_mode"], type=bool))
+            self.dark_mode_check.setChecked(
+                self.settings.value(
+                    "dark_mode", self.default_settings["dark_mode"], type=bool
+                )
+            )
             layout.addWidget(dark_mode_label, 3, 0)
             layout.addWidget(self.dark_mode_check, 3, 1)
 
@@ -568,7 +630,9 @@ class Dashboard(QMainWindow):
         try:
             # Save settings
             self.settings.setValue("session_timeout", self.timeout_spin.value())
-            self.settings.setValue("productivity_threshold", self.threshold_spin.value())
+            self.settings.setValue(
+                "productivity_threshold", self.threshold_spin.value()
+            )
             self.settings.setValue("notification_interval", self.interval_spin.value())
             self.settings.setValue("dark_mode", self.dark_mode_check.isChecked())
             self.settings.sync()  # Ensure settings are written to disk
@@ -586,9 +650,12 @@ class Dashboard(QMainWindow):
     def _apply_theme(self) -> None:
         """Apply dark/light theme."""
         try:
-            if self.settings.value("dark_mode", self.default_settings["dark_mode"], type=bool):
+            if self.settings.value(
+                "dark_mode", self.default_settings["dark_mode"], type=bool
+            ):
                 # Dark theme
-                self.setStyleSheet("""
+                self.setStyleSheet(
+                    """
                     QMainWindow, QWidget {
                         background-color: #2b2b2b;
                         color: #ffffff;
@@ -635,7 +702,8 @@ class Dashboard(QMainWindow):
                     QScrollBar::add-line, QScrollBar::sub-line {
                         background-color: #2b2b2b;
                     }
-                """)
+                """
+                )
             else:
                 # Light theme (default)
                 self.setStyleSheet("")
@@ -680,13 +748,17 @@ class Dashboard(QMainWindow):
         try:
             # Create overview group
             overview_group = QGroupBox("Overview")
-            overview_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            overview_group.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+            )
             overview_layout = QGridLayout()
             overview_group.setLayout(overview_layout)
 
             # Time Period section
             time_group = QGroupBox("Time Period")
-            time_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            time_group.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+            )
             time_layout = QGridLayout()
 
             # Current time period
@@ -709,7 +781,9 @@ class Dashboard(QMainWindow):
 
             # Time Statistics section
             stats_group = QGroupBox("Time Statistics")
-            stats_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            stats_group.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+            )
             stats_layout = QGridLayout()
 
             # Total time
@@ -732,7 +806,9 @@ class Dashboard(QMainWindow):
 
             # Activity Statistics section
             activity_group = QGroupBox("Activity Statistics")
-            activity_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            activity_group.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+            )
             activity_layout = QGridLayout()
 
             # Productivity score
@@ -769,19 +845,25 @@ class Dashboard(QMainWindow):
         try:
             # Create productivity group
             productivity_group = QGroupBox("Productivity")
-            productivity_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            productivity_group.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+            )
             productivity_layout = QVBoxLayout()
             productivity_group.setLayout(productivity_layout)
 
             # Add productivity chart
             self.productivity_chart = ProductivityLineChart()
-            self.productivity_chart.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            self.productivity_chart.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+            )
             self.productivity_chart.setMinimumHeight(200)
             productivity_layout.addWidget(self.productivity_chart)
 
             # Add time heatmap
             self.time_heatmap = TimeHeatmap()
-            self.time_heatmap.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            self.time_heatmap.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+            )
             self.time_heatmap.setMinimumHeight(200)
             productivity_layout.addWidget(self.time_heatmap)
 
@@ -801,16 +883,22 @@ class Dashboard(QMainWindow):
         try:
             # Create activity group
             activity_group = QGroupBox("Recent Activities")
-            activity_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            activity_group.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+            )
             activity_layout = QVBoxLayout()
             activity_group.setLayout(activity_layout)
 
             # Create table view
             table_view = QTableView()
-            table_view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            table_view.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+            )
             table_view.setMinimumHeight(200)
             table_view.setModel(self.activity_model)
-            table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+            table_view.horizontalHeader().setSectionResizeMode(
+                QHeaderView.ResizeMode.ResizeToContents
+            )
             table_view.setAlternatingRowColors(True)
             activity_layout.addWidget(table_view)
 
@@ -830,15 +918,21 @@ class Dashboard(QMainWindow):
         try:
             # Create suggestions group
             suggestions_group = QGroupBox("Task Suggestions")
-            suggestions_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            suggestions_group.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+            )
             suggestions_layout = QVBoxLayout()
             suggestions_group.setLayout(suggestions_layout)
 
             # Create suggestions scroll area
             suggestions_scroll = QScrollArea()
             suggestions_scroll.setWidgetResizable(True)
-            suggestions_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-            suggestions_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            suggestions_scroll.setHorizontalScrollBarPolicy(
+                Qt.ScrollBarPolicy.ScrollBarAsNeeded
+            )
+            suggestions_scroll.setVerticalScrollBarPolicy(
+                Qt.ScrollBarPolicy.ScrollBarAsNeeded
+            )
             suggestions_scroll.setMinimumHeight(300)  # Set minimum height
 
             # Create suggestions container
@@ -870,7 +964,9 @@ class Dashboard(QMainWindow):
         try:
             # Create container widget
             container = QWidget()
-            container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            container.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+            )
             container_layout = QHBoxLayout()
             container.setLayout(container_layout)
 
@@ -883,12 +979,16 @@ class Dashboard(QMainWindow):
             # Add feedback buttons
             accept_btn = QPushButton("✓")
             accept_btn.setFixedSize(24, 24)
-            accept_btn.clicked.connect(lambda: self._handle_suggestion_feedback(suggestion, True))
+            accept_btn.clicked.connect(
+                lambda: self._handle_suggestion_feedback(suggestion, True)
+            )
             container_layout.addWidget(accept_btn)
 
             reject_btn = QPushButton("✗")
             reject_btn.setFixedSize(24, 24)
-            reject_btn.clicked.connect(lambda: self._handle_suggestion_feedback(suggestion, False))
+            reject_btn.clicked.connect(
+                lambda: self._handle_suggestion_feedback(suggestion, False)
+            )
             container_layout.addWidget(reject_btn)
 
             return container
@@ -926,15 +1026,16 @@ class Dashboard(QMainWindow):
         """
         try:
             # Log feedback
-            logger.info(f"Suggestion feedback - {'Accepted' if accepted else 'Rejected'}: {suggestion}")
+            logger.info(
+                f"Suggestion feedback - {'Accepted' if accepted else 'Rejected'}: {suggestion}"
+            )
 
             # Update suggestions
             self._update_suggestions()
 
             # Show feedback message
             self.statusBar().showMessage(
-                f"Suggestion {'accepted' if accepted else 'rejected'}", 
-                3000
+                f"Suggestion {'accepted' if accepted else 'rejected'}", 3000
             )
 
         except Exception as e:
@@ -974,7 +1075,9 @@ class Dashboard(QMainWindow):
                 for i, suggestion in enumerate(suggestions):
                     # Calculate priority based on position (higher priority for first suggestions)
                     priority = 1.0 - (i / len(suggestions))
-                    suggestion_widget = self._create_suggestion_widget(suggestion, priority)
+                    suggestion_widget = self._create_suggestion_widget(
+                        suggestion, priority
+                    )
                     self.suggestions_layout.addWidget(suggestion_widget)
             else:
                 # Add placeholder when no suggestions
@@ -1029,7 +1132,7 @@ class Dashboard(QMainWindow):
                 "daily_metrics",
                 "app_patterns",
                 "productivity_trends",
-                "activities"
+                "activities",
             ]
             missing_keys = [key for key in required_keys if key not in report]
             if missing_keys:
@@ -1043,14 +1146,18 @@ class Dashboard(QMainWindow):
                 return False
 
             required_metrics = ["total_time", "active_time", "idle_time"]
-            missing_metrics = [key for key in required_metrics if key not in daily_metrics]
+            missing_metrics = [
+                key for key in required_metrics if key not in daily_metrics
+            ]
             if missing_metrics:
                 logger.error(f"Missing required metrics: {missing_metrics}")
                 return False
 
             for key in required_metrics:
                 if not isinstance(daily_metrics[key], (int, float)):
-                    logger.error(f"Invalid metric type for {key}: {type(daily_metrics[key])}")
+                    logger.error(
+                        f"Invalid metric type for {key}: {type(daily_metrics[key])}"
+                    )
                     return False
 
             # Validate app patterns
@@ -1063,10 +1170,17 @@ class Dashboard(QMainWindow):
                 if not isinstance(stats, dict):
                     logger.error(f"Invalid stats type for {app_name}: {type(stats)}")
                     return False
-                required_stats = ["total_time", "active_time", "idle_time", "usage_percentage"]
+                required_stats = [
+                    "total_time",
+                    "active_time",
+                    "idle_time",
+                    "usage_percentage",
+                ]
                 missing_stats = [key for key in required_stats if key not in stats]
                 if missing_stats:
-                    logger.error(f"Missing required stats for {app_name}: {missing_stats}")
+                    logger.error(
+                        f"Missing required stats for {app_name}: {missing_stats}"
+                    )
                     return False
 
             # Validate productivity trends
@@ -1098,10 +1212,21 @@ class Dashboard(QMainWindow):
                 if not isinstance(activity, dict):
                     logger.error(f"Invalid activity type: {type(activity)}")
                     return False
-                required_activity_keys = ["start_time", "app_name", "window_title", "duration", "active_time", "idle_time"]
-                missing_activity_keys = [key for key in required_activity_keys if key not in activity]
+                required_activity_keys = [
+                    "start_time",
+                    "app_name",
+                    "window_title",
+                    "duration",
+                    "active_time",
+                    "idle_time",
+                ]
+                missing_activity_keys = [
+                    key for key in required_activity_keys if key not in activity
+                ]
                 if missing_activity_keys:
-                    logger.error(f"Missing required keys in activity: {missing_activity_keys}")
+                    logger.error(
+                        f"Missing required keys in activity: {missing_activity_keys}"
+                    )
                     return False
 
             return True
@@ -1139,7 +1264,9 @@ class Dashboard(QMainWindow):
             # Validate report data
             if not self._validate_report_data(report):
                 logger.error("Invalid report data received")
-                self.statusBar().showMessage("Failed to update dashboard - invalid data")
+                self.statusBar().showMessage(
+                    "Failed to update dashboard - invalid data"
+                )
                 return
 
             # Store report
@@ -1152,13 +1279,17 @@ class Dashboard(QMainWindow):
             activities = []
             for activity in report.get("activities", []):
                 if isinstance(activity, dict):
-                    activities.append({
-                        "time": activity.get("start_time"),
-                        "app_name": activity.get("app_name", "Unknown"),
-                        "window_title": activity.get("window_title", ""),
-                        "duration": activity.get("duration", 0),
-                        "status": "Active" if activity.get("active_time", 0) > 0 else "Idle"
-                    })
+                    activities.append(
+                        {
+                            "time": activity.get("start_time"),
+                            "app_name": activity.get("app_name", "Unknown"),
+                            "window_title": activity.get("window_title", ""),
+                            "duration": activity.get("duration", 0),
+                            "status": "Active"
+                            if activity.get("active_time", 0) > 0
+                            else "Idle",
+                        }
+                    )
             self.activity_model.update_activities(activities)
 
             # Get suggestions
@@ -1289,13 +1420,17 @@ class Dashboard(QMainWindow):
             activities = []
             for activity in self.current_report.get("activities", []):
                 if isinstance(activity, dict):
-                    activities.append({
-                        "time": activity.get("start_time"),
-                        "app_name": activity.get("app_name", "Unknown"),
-                        "window_title": activity.get("window_title", ""),
-                        "duration": activity.get("duration", 0),
-                        "status": "Active" if activity.get("active_time", 0) > 0 else "Idle"
-                    })
+                    activities.append(
+                        {
+                            "time": activity.get("start_time"),
+                            "app_name": activity.get("app_name", "Unknown"),
+                            "window_title": activity.get("window_title", ""),
+                            "duration": activity.get("duration", 0),
+                            "status": "Active"
+                            if activity.get("active_time", 0) > 0
+                            else "Idle",
+                        }
+                    )
             self.activity_model.update_activities(activities)
 
         except Exception as e:
@@ -1309,15 +1444,23 @@ class Dashboard(QMainWindow):
 
             # Get daily metrics
             daily_metrics = self.current_report.get("daily_metrics", {})
-            total_time, active_time, idle_time = self._calculate_time_metrics(daily_metrics)
+            total_time, active_time, idle_time = self._calculate_time_metrics(
+                daily_metrics
+            )
 
             # Update time statistics
-            self.total_time_label.setText(f"Total Time: {self._format_time(total_time)}")
-            self.active_time_label.setText(f"Active Time: {self._format_time(active_time)}")
+            self.total_time_label.setText(
+                f"Total Time: {self._format_time(total_time)}"
+            )
+            self.active_time_label.setText(
+                f"Active Time: {self._format_time(active_time)}"
+            )
             self.idle_time_label.setText(f"Idle Time: {self._format_time(idle_time)}")
 
             # Calculate and update productivity score
-            productivity_score = (active_time / total_time * 100) if total_time > 0 else 0.0
+            productivity_score = (
+                (active_time / total_time * 100) if total_time > 0 else 0.0
+            )
             self.productivity_score_label.setText(f"{productivity_score:.1f}%")
 
             # Update application statistics
@@ -1350,7 +1493,9 @@ class Dashboard(QMainWindow):
 
             # Update hourly statistics
             self.hourly_stats_model.setRowCount(0)
-            hourly_trends = self.current_report.get("productivity_trends", {}).get("hourly", [])
+            hourly_trends = self.current_report.get("productivity_trends", {}).get(
+                "hourly", []
+            )
             for hour, productivity in enumerate(hourly_trends):
                 row = [
                     QStandardItem(f"{hour:02d}:00"),
@@ -1394,7 +1539,9 @@ class Dashboard(QMainWindow):
         # Configure columns
         header = table_view.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)  # Window Title column
+        header.setSectionResizeMode(
+            2, QHeaderView.ResizeMode.Stretch
+        )  # Window Title column
 
         # Style
         table_view.setAlternatingRowColors(True)
@@ -1413,7 +1560,9 @@ class Dashboard(QMainWindow):
         try:
             # Create statistics group boxes
             time_stats_group = QGroupBox("Time Statistics")
-            time_stats_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            time_stats_group.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+            )
             time_stats_layout = QVBoxLayout()
             time_stats_group.setLayout(time_stats_layout)
 
@@ -1431,18 +1580,26 @@ class Dashboard(QMainWindow):
 
             # Create tables group box
             tables_group = QGroupBox("Activity Statistics")
-            tables_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            tables_group.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+            )
             tables_layout = QVBoxLayout()  # Changed to QVBoxLayout
             tables_group.setLayout(tables_layout)
 
             # Application statistics
             app_stats_label = QLabel("Top Applications")
             self.app_stats_model = QStandardItemModel()
-            self.app_stats_model.setHorizontalHeaderLabels(["Application", "Time", "Percentage"])
+            self.app_stats_model.setHorizontalHeaderLabels(
+                ["Application", "Time", "Percentage"]
+            )
             app_stats_view = QTableView()
             app_stats_view.setModel(self.app_stats_model)
-            app_stats_view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-            app_stats_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+            app_stats_view.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+            )
+            app_stats_view.horizontalHeader().setSectionResizeMode(
+                QHeaderView.ResizeMode.ResizeToContents
+            )
             app_stats_view.setAlternatingRowColors(True)
             tables_layout.addWidget(app_stats_label)
             tables_layout.addWidget(app_stats_view)
@@ -1450,11 +1607,17 @@ class Dashboard(QMainWindow):
             # Category statistics
             cat_stats_label = QLabel("Top Categories")
             self.category_stats_model = QStandardItemModel()
-            self.category_stats_model.setHorizontalHeaderLabels(["Category", "Time", "Percentage"])
+            self.category_stats_model.setHorizontalHeaderLabels(
+                ["Category", "Time", "Percentage"]
+            )
             category_stats_view = QTableView()
             category_stats_view.setModel(self.category_stats_model)
-            category_stats_view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-            category_stats_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+            category_stats_view.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+            )
+            category_stats_view.horizontalHeader().setSectionResizeMode(
+                QHeaderView.ResizeMode.ResizeToContents
+            )
             category_stats_view.setAlternatingRowColors(True)
             tables_layout.addWidget(cat_stats_label)
             tables_layout.addWidget(category_stats_view)
@@ -1462,11 +1625,17 @@ class Dashboard(QMainWindow):
             # Hourly statistics
             hour_stats_label = QLabel("Hourly Distribution")
             self.hourly_stats_model = QStandardItemModel()
-            self.hourly_stats_model.setHorizontalHeaderLabels(["Hour", "Time", "Percentage"])
+            self.hourly_stats_model.setHorizontalHeaderLabels(
+                ["Hour", "Time", "Percentage"]
+            )
             hourly_stats_view = QTableView()
             hourly_stats_view.setModel(self.hourly_stats_model)
-            hourly_stats_view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-            hourly_stats_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+            hourly_stats_view.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+            )
+            hourly_stats_view.horizontalHeader().setSectionResizeMode(
+                QHeaderView.ResizeMode.ResizeToContents
+            )
             hourly_stats_view.setAlternatingRowColors(True)
             tables_layout.addWidget(hour_stats_label)
             tables_layout.addWidget(hourly_stats_view)
@@ -1543,30 +1712,35 @@ class Dashboard(QMainWindow):
         """Handle window close event with proper cleanup."""
         try:
             # Stop and cleanup timer
-            if hasattr(self, 'update_timer'):
+            if hasattr(self, "update_timer"):
                 self.update_timer.stop()
                 self.update_timer.deleteLater()
 
             # Remove log handler
-            if hasattr(self, 'log_handler'):
+            if hasattr(self, "log_handler"):
                 logging.getLogger().removeHandler(self.log_handler)
 
             # Clean up layouts
-            if hasattr(self, 'layout'):
+            if hasattr(self, "layout"):
                 self._clear_layout(self.layout())
 
             # Clean up worker
-            if hasattr(self, 'update_worker') and self.update_worker:
+            if hasattr(self, "update_worker") and self.update_worker:
                 self.update_worker.quit()
                 self.update_worker.wait()
                 self.update_worker.deleteLater()
 
             # Save settings
-            if hasattr(self, 'settings'):
+            if hasattr(self, "settings"):
                 self.settings.sync()
 
             # Clean up widgets
-            for attr in ['period_combo', 'productivity_chart', 'time_heatmap', 'tab_widget']:
+            for attr in [
+                "period_combo",
+                "productivity_chart",
+                "time_heatmap",
+                "tab_widget",
+            ]:
                 if hasattr(self, attr):
                     widget = getattr(self, attr)
                     if widget and not widget.isHidden():
@@ -1580,7 +1754,9 @@ class Dashboard(QMainWindow):
             logger.error(f"Error during cleanup: {e}", exc_info=True)
             event.accept()  # Still close even if cleanup fails
 
-    def _calculate_time_metrics(self, daily_metrics: Dict) -> Tuple[float, float, float]:
+    def _calculate_time_metrics(
+        self, daily_metrics: Dict
+    ) -> Tuple[float, float, float]:
         """Calculate time metrics from daily metrics.
 
         Args:

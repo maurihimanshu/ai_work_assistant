@@ -31,9 +31,7 @@ class ContinuousLearner:
         self.event_dispatcher = event_dispatcher
         self.feature_extractor = ActivityFeatureExtractor()
         self.model = RandomForestClassifier(
-            n_estimators=100,
-            max_depth=10,
-            random_state=42
+            n_estimators=100, max_depth=10, random_state=42
         )
         self.is_fitted = False
         self._load_model()
@@ -130,13 +128,14 @@ class ContinuousLearner:
             results = []
             for pred, probs in zip(predictions, probabilities):
                 confidence = max(probs)
-                if confidence > 0.3:  # Only include predictions with reasonable confidence
-                    results.append({
-                        "type": pred,
-                        "confidence": confidence
-                    })
+                if (
+                    confidence > 0.3
+                ):  # Only include predictions with reasonable confidence
+                    results.append({"type": pred, "confidence": confidence})
 
-            return sorted(results, key=lambda x: x["confidence"], reverse=True)[:5]  # Return top 5
+            return sorted(results, key=lambda x: x["confidence"], reverse=True)[
+                :5
+            ]  # Return top 5
 
         except Exception as e:
             logger.error(f"Error making prediction: {e}", exc_info=True)

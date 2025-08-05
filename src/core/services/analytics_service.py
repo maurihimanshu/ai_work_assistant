@@ -55,7 +55,9 @@ class AnalyticsService:
             start_time = end_time - time_window
             activities = self.repository.get_by_timerange(start_time, end_time)
 
-            logger.info(f"Generating productivity report for {len(activities)} activities")
+            logger.info(
+                f"Generating productivity report for {len(activities)} activities"
+            )
 
             if not activities:
                 return self._get_empty_report()
@@ -67,7 +69,11 @@ class AnalyticsService:
             total_idle = 0
 
             for activity in activities:
-                duration = (activity.end_time - activity.start_time).total_seconds() if activity.end_time else 0
+                duration = (
+                    (activity.end_time - activity.start_time).total_seconds()
+                    if activity.end_time
+                    else 0
+                )
                 activity_dict = {
                     "start_time": activity.start_time,
                     "end_time": activity.end_time,
@@ -115,7 +121,9 @@ class AnalyticsService:
             # Calculate category patterns
             category_patterns = {}
             for activity in activity_dicts:
-                category = insights.get("categories", {}).get(activity["app_name"], "Unknown")
+                category = insights.get("categories", {}).get(
+                    activity["app_name"], "Unknown"
+                )
                 if category not in category_patterns:
                     category_patterns[category] = {
                         "total_time": 0,
@@ -123,9 +131,13 @@ class AnalyticsService:
                         "usage_percentage": 0,
                     }
                 category_patterns[category]["total_time"] += activity["duration"]
-                if activity["app_name"] not in category_patterns[category].get("apps", set()):
+                if activity["app_name"] not in category_patterns[category].get(
+                    "apps", set()
+                ):
                     category_patterns[category]["app_count"] += 1
-                    category_patterns[category].setdefault("apps", set()).add(activity["app_name"])
+                    category_patterns[category].setdefault("apps", set()).add(
+                        activity["app_name"]
+                    )
 
             # Calculate category usage percentages
             if total_time > 0:
@@ -147,8 +159,12 @@ class AnalyticsService:
                     day = start.weekday()
                     productivity = activity["active_time"] / activity["duration"]
 
-                    hourly_trends[hour] = ((hourly_trends[hour] * hourly_counts[hour]) + productivity) / (hourly_counts[hour] + 1)
-                    daily_trends[day] = ((daily_trends[day] * daily_counts[day]) + productivity) / (daily_counts[day] + 1)
+                    hourly_trends[hour] = (
+                        (hourly_trends[hour] * hourly_counts[hour]) + productivity
+                    ) / (hourly_counts[hour] + 1)
+                    daily_trends[day] = (
+                        (daily_trends[day] * daily_counts[day]) + productivity
+                    ) / (daily_counts[day] + 1)
 
                     hourly_counts[hour] += 1
                     daily_counts[day] += 1
@@ -164,7 +180,7 @@ class AnalyticsService:
                     "daily": daily_trends,
                 },
                 "activities": activity_dicts,
-                "insights": insights
+                "insights": insights,
             }
 
         except Exception as e:
@@ -193,8 +209,8 @@ class AnalyticsService:
             "insights": {
                 "categories": {},
                 "overall_productivity": 0.0,
-                "suggestions": []
-            }
+                "suggestions": [],
+            },
         }
 
     def update_analytics(self) -> None:

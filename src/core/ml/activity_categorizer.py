@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
+
 class ActivityCategorizer:
     """Categorizes activities based on patterns and rules."""
 
@@ -26,7 +27,6 @@ class ActivityCategorizer:
             "pycharm64.exe": "Development",
             "studio64.exe": "Development",
             "cursor.exe": "Development",
-
             # Productivity
             "outlook.exe": "Communication",
             "teams.exe": "Communication",
@@ -35,14 +35,12 @@ class ActivityCategorizer:
             "skype.exe": "Communication",
             "discord.exe": "Communication",
             "msteams.exe": "Communication",
-
             # Browsers
             "chrome.exe": "Web Browsing",
             "firefox.exe": "Web Browsing",
             "msedge.exe": "Web Browsing",
             "opera.exe": "Web Browsing",
             "brave.exe": "Web Browsing",
-
             # Office
             "excel.exe": "Office Work",
             "word.exe": "Office Work",
@@ -51,7 +49,6 @@ class ActivityCategorizer:
             "winword.exe": "Office Work",
             "notepad.exe": "Office Work",
             "notepad++.exe": "Office Work",
-
             # Entertainment
             "spotify.exe": "Entertainment",
             "vlc.exe": "Entertainment",
@@ -59,7 +56,6 @@ class ActivityCategorizer:
             "netflix.exe": "Entertainment",
             "youtube.exe": "Entertainment",
             "wmplayer.exe": "Entertainment",
-
             # System
             "explorer.exe": "System",
             "taskmgr.exe": "System",
@@ -93,7 +89,7 @@ class ActivityCategorizer:
                     "categories": {},
                     "overall_productivity": 0.0,
                     "category_distribution": {},
-                    "suggestions": []
+                    "suggestions": [],
                 }
 
             # Categorize activities
@@ -124,10 +120,14 @@ class ActivityCategorizer:
 
                 # Calculate activity productivity
                 activity_productivity = active_time / duration  # Between 0 and 1
-                category_productivity = self.category_productivity.get(category, 0.4)  # Between 0 and 1
+                category_productivity = self.category_productivity.get(
+                    category, 0.4
+                )  # Between 0 and 1
 
                 # Weight productivity by duration and category
-                weighted_productivity += activity_productivity * category_productivity * duration
+                weighted_productivity += (
+                    activity_productivity * category_productivity * duration
+                )
                 total_weighted_time += duration
 
             # Calculate overall productivity (normalized between 0 and 1)
@@ -144,17 +144,19 @@ class ActivityCategorizer:
                 productivity = self.category_productivity.get(category, 0.4)
                 category_distribution[category] = {
                     "time_percentage": percentage,
-                    "productivity_score": productivity
+                    "productivity_score": productivity,
                 }
 
             # Generate suggestions based on insights
-            suggestions = self._generate_suggestions(category_distribution, overall_productivity)
+            suggestions = self._generate_suggestions(
+                category_distribution, overall_productivity
+            )
 
             return {
                 "categories": categories,
                 "overall_productivity": overall_productivity,
                 "category_distribution": category_distribution,
-                "suggestions": suggestions
+                "suggestions": suggestions,
             }
 
         except Exception as e:
@@ -163,10 +165,12 @@ class ActivityCategorizer:
                 "categories": {},
                 "overall_productivity": 0.0,
                 "category_distribution": {},
-                "suggestions": []
+                "suggestions": [],
             }
 
-    def _generate_suggestions(self, category_distribution: Dict[str, Dict], overall_productivity: float) -> List[str]:
+    def _generate_suggestions(
+        self, category_distribution: Dict[str, Dict], overall_productivity: float
+    ) -> List[str]:
         """Generate suggestions based on activity patterns.
 
         Args:
@@ -183,25 +187,33 @@ class ActivityCategorizer:
             if overall_productivity < 0.4:
                 suggestions.append("Consider focusing on more productive activities")
             elif overall_productivity < 0.6:
-                suggestions.append("Try to increase time spent on development and work tasks")
+                suggestions.append(
+                    "Try to increase time spent on development and work tasks"
+                )
 
             # Check entertainment time
             entertainment = category_distribution.get("Entertainment", {})
             entertainment_time = entertainment.get("time_percentage", 0)
             if entertainment_time > 0.3:
-                suggestions.append("High entertainment time detected. Consider reducing non-work activities")
+                suggestions.append(
+                    "High entertainment time detected. Consider reducing non-work activities"
+                )
 
             # Check development time
             dev = category_distribution.get("Development", {})
             dev_time = dev.get("time_percentage", 0)
             if dev_time < 0.3:
-                suggestions.append("Consider increasing time spent on development tasks")
+                suggestions.append(
+                    "Consider increasing time spent on development tasks"
+                )
 
             # Check communication balance
             comm = category_distribution.get("Communication", {})
             comm_time = comm.get("time_percentage", 0)
             if comm_time > 0.4:
-                suggestions.append("High communication time. Consider setting aside focused work periods")
+                suggestions.append(
+                    "High communication time. Consider setting aside focused work periods"
+                )
 
             # Limit suggestions
             return suggestions[:3]

@@ -32,6 +32,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+
 def setup_data_directories():
     """Create necessary data directories if they don't exist."""
     directories = [
@@ -43,6 +44,7 @@ def setup_data_directories():
     ]
     for directory in directories:
         os.makedirs(directory, exist_ok=True)
+
 
 def initialize_services():
     """Initialize all application services.
@@ -66,8 +68,7 @@ def initialize_services():
         logger.info("Initializing ML components...")
         logger.info("Initializing continuous learner...")
         learner = ContinuousLearner(
-            model_dir="data/models",
-            event_dispatcher=event_dispatcher
+            model_dir="data/models", event_dispatcher=event_dispatcher
         )
 
         # Initialize activity categorizer
@@ -130,6 +131,7 @@ def initialize_services():
         logger.error(f"Error initializing services: {e}", exc_info=True)
         raise
 
+
 def main():
     """Main entry point."""
     try:
@@ -185,6 +187,7 @@ def main():
     except Exception as e:
         logger.error(f"Failed to start AI Work Assistant: {e}", exc_info=True)
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

@@ -13,15 +13,18 @@ from .base_monitor import BaseMonitor
 
 logger = logging.getLogger(__name__)
 
+
 # Define Windows types and structures
 class LASTINPUTINFO(ctypes.Structure):
     _fields_ = [
-        ('cbSize', ctypes.c_uint),
-        ('dwTime', ctypes.c_uint),
+        ("cbSize", ctypes.c_uint),
+        ("dwTime", ctypes.c_uint),
     ]
+
 
 # Define callback type for EnumWindows
 WNDENUMPROC = WINFUNCTYPE(c_bool, wintypes.HWND, wintypes.LPARAM)
+
 
 class WindowsMonitor(BaseMonitor):
     """Windows implementation of platform monitoring."""
@@ -35,7 +38,11 @@ class WindowsMonitor(BaseMonitor):
             # Set up function argument types
             self.user32.GetLastInputInfo.argtypes = [ctypes.POINTER(LASTINPUTINFO)]
             self.user32.GetWindowTextLengthW.argtypes = [wintypes.HWND]
-            self.user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+            self.user32.GetWindowTextW.argtypes = [
+                wintypes.HWND,
+                wintypes.LPWSTR,
+                ctypes.c_int,
+            ]
             self.user32.IsWindowVisible.argtypes = [wintypes.HWND]
             self.user32.EnumWindows.argtypes = [WNDENUMPROC, wintypes.LPARAM]
             self.user32.EnumWindows.restype = c_bool
@@ -160,19 +167,14 @@ class WindowsMonitor(BaseMonitor):
         """
         try:
             process_handle = self.kernel32.OpenProcess(
-                0x1000,  # PROCESS_QUERY_LIMITED_INFORMATION
-                False,
-                process_id
+                0x1000, False, process_id  # PROCESS_QUERY_LIMITED_INFORMATION
             )
             if process_handle:
                 try:
                     path_buffer = ctypes.create_unicode_buffer(260)  # MAX_PATH
                     path_length = ctypes.c_uint(260)
                     if self.kernel32.QueryFullProcessImageNameW(
-                        process_handle,
-                        0,
-                        path_buffer,
-                        ctypes.byref(path_length)
+                        process_handle, 0, path_buffer, ctypes.byref(path_length)
                     ):
                         return os.path.basename(path_buffer.value)
                 finally:
@@ -204,7 +206,9 @@ class WindowsMonitor(BaseMonitor):
         """
         try:
             if self.user32.GetLastInputInfo(ctypes.byref(self._last_input_info)):
-                idle_time = (self.kernel32.GetTickCount() - self._last_input_info.dwTime) / 1000.0
+                idle_time = (
+                    self.kernel32.GetTickCount() - self._last_input_info.dwTime
+                ) / 1000.0
                 logger.debug(f"Current idle time: {idle_time:.1f}s")
                 return idle_time
             else:
