@@ -32,7 +32,7 @@ def sample_activity():
         window_title="Test Window",
         process_id=1234,
         executable_path="/path/test",
-        start_time=datetime.now()
+        start_time=datetime.now(),
     )
 
 
@@ -106,7 +106,7 @@ def test_get_by_timerange(storage):
             window_title=f"window_{i}",
             process_id=i,
             executable_path=f"/path/{i}",
-            start_time=now + timedelta(minutes=i)
+            start_time=now + timedelta(minutes=i),
         )
         for i in range(5)
     ]
@@ -132,7 +132,7 @@ def test_cleanup_old_activities(storage):
         window_title="Old Window",
         process_id=1,
         executable_path="/path/old",
-        start_time=now - timedelta(days=40)
+        start_time=now - timedelta(days=40),
     )
 
     new_activity = Activity(
@@ -140,7 +140,7 @@ def test_cleanup_old_activities(storage):
         window_title="New Window",
         process_id=2,
         executable_path="/path/new",
-        start_time=now - timedelta(days=5)
+        start_time=now - timedelta(days=5),
     )
 
     old_id = storage.add(old_activity)
@@ -165,7 +165,7 @@ def test_data_encryption(temp_dir):
         window_title="Test Window",
         process_id=1234,
         executable_path="/path/test",
-        start_time=datetime.now()
+        start_time=datetime.now(),
     )
     storage.add(activity)
 
@@ -178,8 +178,7 @@ def test_data_encryption(temp_dir):
 
     # Verify we can still read it through the storage interface
     activities = storage.get_by_timerange(
-        datetime.now() - timedelta(minutes=1),
-        datetime.now() + timedelta(minutes=1)
+        datetime.now() - timedelta(minutes=1), datetime.now() + timedelta(minutes=1)
     )
     assert len(activities) == 1
     assert activities[0].app_name == "test_app"

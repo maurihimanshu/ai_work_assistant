@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Set
 from ..entities.activity import Activity
 from ..events.event_dispatcher import EventDispatcher
 from ..events.event_types import SessionEvent
-from ..interfaces.activity_repository import ActivityRepository
+from ..services.activity_monitor import ActivityMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -19,22 +19,23 @@ class SessionService:
 
     def __init__(
         self,
-        repository: ActivityRepository,
+        activity_monitor: ActivityMonitor,
         event_dispatcher: EventDispatcher,
         session_dir: str = "./sessions",
         inactivity_threshold: timedelta = timedelta(minutes=30),
-        auto_save_interval: timedelta = timedelta(minutes=5)
+        auto_save_interval: timedelta = timedelta(minutes=5),
     ):
         """Initialize session service.
 
         Args:
-            repository: Activity repository
+            activity_monitor: Activity monitor service
             event_dispatcher: Event dispatcher
             session_dir: Directory for session files
             inactivity_threshold: Time before session is considered inactive
             auto_save_interval: How often to auto-save session state
         """
-        self.repository = repository
+        self.activity_monitor = activity_monitor
+        self.repository = activity_monitor.repository  # For backward compatibility
         self.event_dispatcher = event_dispatcher
         self.session_dir = Path(session_dir)
         self.inactivity_threshold = inactivity_threshold
@@ -44,11 +45,7 @@ class SessionService:
         self.last_activity_time: Optional[datetime] = None
         self.last_save_time: Optional[datetime] = None
         self.active_apps: Set[str] = set()
-        self.session_state: Dict = {
-            'id': None,
-            'start_time': None,
-            'state': {}
-        }
+        self.session_state: Dict = {"id": None, "start_time": None, "state": {}}
 
         # Create session directory if it doesn't exist
         self.session_dir.mkdir(parents=True, exist_ok=True)
@@ -68,9 +65,9 @@ class SessionService:
         self.last_save_time = current_time
         self.active_apps.clear()
         self.session_state = {
-            'id': session_id,
-            'start_time': current_time.isoformat(),
-            'state': {}
+            "id": session_id,
+            "start_time": current_time.isoformat(),
+            "state": {},
         }
 
         # Save initial state
@@ -80,8 +77,8 @@ class SessionService:
         self.event_dispatcher.dispatch(
             SessionEvent(
                 session_id=session_id,
-                event_type='session_start',
-                timestamp=current_time
+                event_type="session_start",
+                timestamp=current_time,
             )
         )
 
@@ -95,7 +92,7 @@ class SessionService:
         current_time = datetime.now()
 
         # Update session state
-        self.session_state['end_time'] = current_time.isoformat()
+        self.session_state["end_time"] = current_time.isoformat()
 
         # Save final state
         self._save_session_state()
@@ -104,8 +101,8 @@ class SessionService:
         self.event_dispatcher.dispatch(
             SessionEvent(
                 session_id=self.current_session_id,
-                event_type='session_end',
-                timestamp=current_time
+                event_type="session_end",
+                timestamp=current_time,
             )
         )
 
@@ -133,18 +130,20 @@ class SessionService:
         # Update state
         if not isinstance(self.session_state, dict):
             self.session_state = {
-                'id': self.current_session_id,
-                'start_time': current_time.isoformat(),
-                'state': {}
+                "id": self.current_session_id,
+                "start_time": current_time.isoformat(),
+                "state": {},
             }
-        if 'state' not in self.session_state:
-            self.session_state['state'] = {}
-        self.session_state['state'][app_name] = state_data.copy()  # Make a copy to avoid reference issues
+        if "state" not in self.session_state:
+            self.session_state["state"] = {}
+        self.session_state["state"][
+            app_name
+        ] = state_data.copy()  # Make a copy to avoid reference issues
 
         # Auto-save if needed
         if (
-            not self.last_save_time or
-            current_time - self.last_save_time >= self.auto_save_interval
+            not self.last_save_time
+            or current_time - self.last_save_time >= self.auto_save_interval
         ):
             self._save_session_state()
             self.last_save_time = current_time
@@ -161,8 +160,8 @@ class SessionService:
         if app_name in self.active_apps:
             self.active_apps.remove(app_name)
 
-        if 'state' in self.session_state:
-            self.session_state['state'].pop(app_name, None)
+        if "state" in self.session_state:
+            self.session_state["state"].pop(app_name, None)
             self._save_session_state()
 
     def check_session_timeout(self) -> bool:
@@ -175,9 +174,7 @@ class SessionService:
             return False
 
         current_time = datetime.now()
-        return (
-            current_time - self.last_activity_time >= self.inactivity_threshold
-        )
+        return current_time - self.last_activity_time >= self.inactivity_threshold
 
     def get_recent_sessions(self, limit: int = 5) -> List[Dict]:
         """Get recent sessions.
@@ -199,20 +196,24 @@ class SessionService:
                 try:
                     # Skip current session file if it's active
                     if (
-                        self.current_session_id and
-                        file.name == f"session_{self.current_session_id}.json"
+                        self.current_session_id
+                        and file.name == f"session_{self.current_session_id}.json"
                     ):
                         continue
 
                     # Use context manager to ensure proper file handling
-                    with open(file, 'r') as f:
+                    with open(file, "r") as f:
                         data = json.load(f)
-                        if isinstance(data, dict) and 'id' in data and 'start_time' in data:
+                        if (
+                            isinstance(data, dict)
+                            and "id" in data
+                            and "start_time" in data
+                        ):
                             session = {
-                                'id': data['id'],
-                                'start_time': data['start_time'],
-                                'end_time': data.get('end_time'),
-                                'active_apps': list(data.get('state', {}).keys())
+                                "id": data["id"],
+                                "start_time": data["start_time"],
+                                "end_time": data.get("end_time"),
+                                "active_apps": list(data.get("state", {}).keys()),
                             }
                             all_sessions.append(session)
                 except Exception as e:
@@ -220,7 +221,7 @@ class SessionService:
                     continue
 
             # Sort sessions by ID (which includes timestamp with microseconds) in reverse order
-            all_sessions.sort(key=lambda x: x['id'], reverse=True)
+            all_sessions.sort(key=lambda x: x["id"], reverse=True)
 
             return all_sessions[:limit]
 
@@ -244,7 +245,7 @@ class SessionService:
         if not session_file.exists():
             raise FileNotFoundError(f"Session file not found: {session_file}")
 
-        with open(session_file, 'r') as f:
+        with open(session_file, "r") as f:
             session_data = json.load(f)
 
             # Restore session state
@@ -252,14 +253,11 @@ class SessionService:
             self.last_activity_time = datetime.now()
             self.last_save_time = datetime.now()
             self.session_state = session_data
-            self.active_apps = set(session_data.get('state', {}).keys())
+            self.active_apps = set(session_data.get("state", {}).keys())
 
             return session_data
 
-    def cleanup_old_sessions(
-        self,
-        max_age: timedelta = timedelta(days=30)
-    ) -> None:
+    def cleanup_old_sessions(self, max_age: timedelta = timedelta(days=30)) -> None:
         """Clean up old session files.
 
         Args:
@@ -276,8 +274,8 @@ class SessionService:
             for file in session_files:
                 # Skip current session file if it's active
                 if (
-                    self.current_session_id and
-                    file.name == f"session_{self.current_session_id}.json"
+                    self.current_session_id
+                    and file.name == f"session_{self.current_session_id}.json"
                 ):
                     continue
 
@@ -286,13 +284,13 @@ class SessionService:
 
                     # Read file data using context manager
                     try:
-                        with open(file, 'r') as f:
+                        with open(file, "r") as f:
                             data = json.load(f)
 
-                            if not isinstance(data, dict) or 'start_time' not in data:
+                            if not isinstance(data, dict) or "start_time" not in data:
                                 delete_file = True
                             else:
-                                start_time = datetime.fromisoformat(data['start_time'])
+                                start_time = datetime.fromisoformat(data["start_time"])
                                 delete_file = start_time < cutoff_time
                     except json.JSONDecodeError:
                         delete_file = True
@@ -305,13 +303,15 @@ class SessionService:
                         try:
                             # Force handle cleanup
                             import gc
+
                             gc.collect()
 
                             # Use Windows-specific file deletion
-                            if hasattr(file, 'unlink'):
+                            if hasattr(file, "unlink"):
                                 file.unlink(missing_ok=True)
                             else:
                                 import os
+
                                 try:
                                     os.remove(str(file))
                                 except FileNotFoundError:
@@ -340,14 +340,14 @@ class SessionService:
         try:
             # Load session data
             session_file = self._get_session_file(session_id)
-            with open(session_file, 'r') as f:
+            with open(session_file, "r") as f:
                 session_data = json.load(f)
 
             # Get activities between start and end time
-            start_time = datetime.fromisoformat(session_data['start_time'])
+            start_time = datetime.fromisoformat(session_data["start_time"])
             end_time = (
-                datetime.fromisoformat(session_data['end_time'])
-                if 'end_time' in session_data
+                datetime.fromisoformat(session_data["end_time"])
+                if "end_time" in session_data
                 else datetime.now()
             )
 
@@ -364,15 +364,15 @@ class SessionService:
 
         try:
             # Ensure state exists
-            if 'state' not in self.session_state:
-                self.session_state['state'] = {}
+            if "state" not in self.session_state:
+                self.session_state["state"] = {}
 
             # Create a copy to avoid modifying the original
             state_to_save = self.session_state.copy()
 
             # Save to file using context manager
             session_file = self._get_session_file(self.current_session_id)
-            with open(session_file, 'w') as f:
+            with open(session_file, "w") as f:
                 json.dump(state_to_save, f, indent=2)
                 f.flush()  # Ensure data is written to disk
 

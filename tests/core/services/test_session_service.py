@@ -40,7 +40,7 @@ def session_service(temp_session_dir, mock_repository, mock_dispatcher):
         event_dispatcher=mock_dispatcher,
         session_dir=temp_session_dir,
         inactivity_threshold=timedelta(minutes=30),
-        auto_save_interval=timedelta(minutes=5)
+        auto_save_interval=timedelta(minutes=5),
     )
     yield service
     # Clean up any open files
@@ -55,7 +55,7 @@ def test_session_initialization(session_service):
     assert session_service.last_save_time is None
     assert len(session_service.active_apps) == 0
     assert isinstance(session_service.session_state, dict)
-    assert session_service.session_state['state'] == {}
+    assert session_service.session_state["state"] == {}
 
 
 def test_session_state_persistence(session_service, temp_session_dir):
@@ -74,18 +74,18 @@ def test_session_state_persistence(session_service, temp_session_dir):
     assert session_file.exists()
 
     # Verify file contents
-    with open(session_file, 'r') as f:
+    with open(session_file, "r") as f:
         saved_state = json.load(f)
-        assert saved_state['id'] == session_id
-        assert saved_state['state'] == {app_name: state_data}
-        assert 'start_time' in saved_state
-        assert 'end_time' not in saved_state
+        assert saved_state["id"] == session_id
+        assert saved_state["state"] == {app_name: state_data}
+        assert "start_time" in saved_state
+        assert "end_time" not in saved_state
 
     # Test state removal
     session_service.remove_app_state(app_name)
-    with open(session_file, 'r') as f:
+    with open(session_file, "r") as f:
         saved_state = json.load(f)
-        assert app_name not in saved_state['state']
+        assert app_name not in saved_state["state"]
 
 
 def test_recent_sessions(session_service):
@@ -100,6 +100,7 @@ def test_recent_sessions(session_service):
         session_service.end_session()
         # Ensure file handles are closed
         import gc
+
         gc.collect()
         time.sleep(0.1)  # Add delay to ensure different timestamps
 
@@ -107,10 +108,10 @@ def test_recent_sessions(session_service):
     recent = session_service.get_recent_sessions(limit=2)
     assert len(recent) == 2
     # Should be ordered by start time (most recent first)
-    assert recent[0]['id'] == sessions[-1]
-    assert recent[1]['id'] == sessions[-2]
-    assert recent[0]['active_apps'] == ['app_2']
-    assert recent[1]['active_apps'] == ['app_1']
+    assert recent[0]["id"] == sessions[-1]
+    assert recent[1]["id"] == sessions[-2]
+    assert recent[0]["active_apps"] == ["app_2"]
+    assert recent[1]["active_apps"] == ["app_1"]
 
     # Test with invalid files
     invalid_file = Path(session_service.session_dir) / "session_invalid.json"
@@ -129,6 +130,7 @@ def test_session_cleanup(session_service):
 
     # Ensure file handles are closed
     import gc
+
     gc.collect()
     time.sleep(0.1)  # Ensure different timestamps
 
@@ -144,10 +146,10 @@ def test_session_cleanup(session_service):
 
     # Simulate old file by modifying session data
     old_file = session_service._get_session_file(old_session)
-    with open(old_file, 'r+') as f:
+    with open(old_file, "r+") as f:
         data = json.load(f)
-        data['start_time'] = (datetime.now() - timedelta(days=31)).isoformat()
-        data['end_time'] = (datetime.now() - timedelta(days=31)).isoformat()
+        data["start_time"] = (datetime.now() - timedelta(days=31)).isoformat()
+        data["end_time"] = (datetime.now() - timedelta(days=31)).isoformat()
         f.seek(0)
         json.dump(data, f)
         f.truncate()
@@ -192,8 +194,8 @@ def test_session_restore(session_service):
 
     # Restore session
     restored_state = session_service.restore_session(session_id)
-    assert restored_state['id'] == session_id
-    assert "test_app" in restored_state['state']
+    assert restored_state["id"] == session_id
+    assert "test_app" in restored_state["state"]
 
     # Test restoring non-existent session
     with pytest.raises(FileNotFoundError):

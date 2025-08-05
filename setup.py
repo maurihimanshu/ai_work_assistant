@@ -18,6 +18,6 @@ setup(
         "pytest>=7.0.0",
         "pytest-qt>=4.0.0",
         "pytest-benchmark>=4.0.0",
-        "pytest-cov>=3.0.0"
-    ]
+        "pytest-cov>=3.0.0",
+    ],
 )

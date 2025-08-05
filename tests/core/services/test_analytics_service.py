@@ -37,7 +37,7 @@ def analytics_service(mock_repository, mock_dispatcher, mock_categorizer):
         event_dispatcher=mock_dispatcher,
         categorizer=mock_categorizer,
         update_interval=timedelta(minutes=30),
-        analysis_window=timedelta(days=30)
+        analysis_window=timedelta(days=30),
     )
 
 
@@ -52,14 +52,14 @@ def sample_activities():
         end_time = start_time + timedelta(minutes=45)
 
         activity = Activity(
-            app_name=f'test_app_{i}',
-            window_title=f'Test Window {i}',
+            app_name=f"test_app_{i}",
+            window_title=f"Test Window {i}",
             process_id=1000 + i,
-            executable_path=f'/path/to/test_{i}',
+            executable_path=f"/path/to/test_{i}",
             start_time=start_time,
             end_time=end_time,
             active_time=2700,  # 45 minutes
-            idle_time=300  # 5 minutes
+            idle_time=300,  # 5 minutes
         )
         activities.append(activity)
 
@@ -79,15 +79,15 @@ def test_get_empty_report(analytics_service):
 
     report = analytics_service._get_empty_report(start_time, end_time)
 
-    assert report['summary']['time_period']['start'] == start_time.isoformat()
-    assert report['summary']['time_period']['end'] == end_time.isoformat()
-    assert report['summary']['overall_productivity'] == 0.0
-    assert report['summary']['total_active_time'] == 0.0
-    assert report['summary']['total_idle_time'] == 0.0
-    assert report['app_patterns'] == {}
-    assert report['behavior_patterns'] == []
-    assert report['daily_metrics'] == {}
-    assert report['productivity_trends'] == {}
+    assert report["summary"]["time_period"]["start"] == start_time.isoformat()
+    assert report["summary"]["time_period"]["end"] == end_time.isoformat()
+    assert report["summary"]["overall_productivity"] == 0.0
+    assert report["summary"]["total_active_time"] == 0.0
+    assert report["summary"]["total_idle_time"] == 0.0
+    assert report["app_patterns"] == {}
+    assert report["behavior_patterns"] == []
+    assert report["daily_metrics"] == {}
+    assert report["productivity_trends"] == {}
 
 
 def test_calculate_overall_productivity(analytics_service, sample_activities):
@@ -104,14 +104,14 @@ def test_get_app_patterns(analytics_service, sample_activities):
 
     assert len(patterns) > 0
     for app_name, stats in patterns.items():
-        assert 'total_time' in stats
-        assert 'active_time' in stats
-        assert 'idle_time' in stats
-        assert 'usage_percentage' in stats
-        assert stats['total_time'] > 0
-        assert stats['active_time'] > 0
-        assert stats['idle_time'] > 0
-        assert 0.0 <= stats['usage_percentage'] <= 1.0
+        assert "total_time" in stats
+        assert "active_time" in stats
+        assert "idle_time" in stats
+        assert "usage_percentage" in stats
+        assert stats["total_time"] > 0
+        assert stats["active_time"] > 0
+        assert stats["idle_time"] > 0
+        assert 0.0 <= stats["usage_percentage"] <= 1.0
 
 
 def test_get_behavior_patterns(analytics_service, sample_activities):
@@ -120,10 +120,10 @@ def test_get_behavior_patterns(analytics_service, sample_activities):
 
     assert isinstance(patterns, list)
     for pattern in patterns:
-        assert 'type' in pattern
-        assert 'details' in pattern
-        assert 'significance' in pattern
-        assert 0.0 <= pattern['significance'] <= 1.0
+        assert "type" in pattern
+        assert "details" in pattern
+        assert "significance" in pattern
+        assert 0.0 <= pattern["significance"] <= 1.0
 
 
 def test_get_daily_metrics(analytics_service, sample_activities):
@@ -132,24 +132,24 @@ def test_get_daily_metrics(analytics_service, sample_activities):
 
     assert len(metrics) > 0
     for date, stats in metrics.items():
-        assert 'active_time' in stats
-        assert 'idle_time' in stats
-        assert 'productivity' in stats
-        assert stats['active_time'] > 0
-        assert stats['idle_time'] > 0
-        assert 0.0 <= stats['productivity'] <= 1.0
+        assert "active_time" in stats
+        assert "idle_time" in stats
+        assert "productivity" in stats
+        assert stats["active_time"] > 0
+        assert stats["idle_time"] > 0
+        assert 0.0 <= stats["productivity"] <= 1.0
 
 
 def test_get_productivity_trends(analytics_service, sample_activities):
     """Test productivity trend analysis."""
     trends = analytics_service._get_productivity_trends(sample_activities)
 
-    assert 'hourly' in trends
-    assert 'daily' in trends
-    assert len(trends['hourly']) == 24
-    assert len(trends['daily']) == 7
-    assert all(0.0 <= x <= 1.0 for x in trends['hourly'])
-    assert all(0.0 <= x <= 1.0 for x in trends['daily'])
+    assert "hourly" in trends
+    assert "daily" in trends
+    assert len(trends["hourly"]) == 24
+    assert len(trends["daily"]) == 7
+    assert all(0.0 <= x <= 1.0 for x in trends["hourly"])
+    assert all(0.0 <= x <= 1.0 for x in trends["daily"])
 
 
 def test_update_analytics(analytics_service, mock_repository, mock_dispatcher):
@@ -167,26 +167,22 @@ def test_update_analytics(analytics_service, mock_repository, mock_dispatcher):
     assert not mock_dispatcher.dispatch.called
 
 
-def test_get_productivity_report(
-    analytics_service,
-    mock_repository,
-    sample_activities
-):
+def test_get_productivity_report(analytics_service, mock_repository, sample_activities):
     """Test productivity report generation."""
     # Mock repository response
     mock_repository.get_by_timerange.return_value = sample_activities
 
     report = analytics_service.get_productivity_report()
 
-    assert 'summary' in report
-    assert 'app_patterns' in report
-    assert 'behavior_patterns' in report
-    assert 'daily_metrics' in report
-    assert 'productivity_trends' in report
+    assert "summary" in report
+    assert "app_patterns" in report
+    assert "behavior_patterns" in report
+    assert "daily_metrics" in report
+    assert "productivity_trends" in report
 
-    assert report['summary']['overall_productivity'] > 0.0
-    assert report['summary']['total_active_time'] > 0.0
-    assert report['summary']['total_idle_time'] > 0.0
+    assert report["summary"]["overall_productivity"] > 0.0
+    assert report["summary"]["total_active_time"] > 0.0
+    assert report["summary"]["total_idle_time"] > 0.0
 
 
 def test_update_interval(analytics_service, mock_repository, mock_dispatcher):

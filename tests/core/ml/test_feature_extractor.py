@@ -21,10 +21,10 @@ def sample_activities():
             window_title=f"window_{i}",
             process_id=i,
             executable_path=f"/path/to/app_{i}",
-            start_time=now + timedelta(minutes=i*5)
+            start_time=now + timedelta(minutes=i * 5),
         )
         activity.active_time = float(60 * (i + 1))  # i+1 minutes active
-        activity.idle_time = float(30 * (i + 1))    # (i+1)/2 minutes idle
+        activity.idle_time = float(30 * (i + 1))  # (i+1)/2 minutes idle
         activity.end_time = activity.start_time + timedelta(
             seconds=activity.active_time + activity.idle_time
         )
@@ -47,17 +47,17 @@ def test_time_features_extraction():
 
     features = extractor._extract_time_features(now)
 
-    assert 'hour' in features
-    assert 'day_of_week' in features
-    assert 'is_weekend' in features
-    assert 'is_work_hours' in features
-    assert 'time_period' in features
+    assert "hour" in features
+    assert "day_of_week" in features
+    assert "is_weekend" in features
+    assert "is_work_hours" in features
+    assert "time_period" in features
 
-    assert 0 <= features['hour'] <= 23
-    assert 0 <= features['day_of_week'] <= 6
-    assert features['is_weekend'] in [0, 1]
-    assert features['is_work_hours'] in [0, 1]
-    assert 0 <= features['time_period'] <= 5
+    assert 0 <= features["hour"] <= 23
+    assert 0 <= features["day_of_week"] <= 6
+    assert features["is_weekend"] in [0, 1]
+    assert features["is_work_hours"] in [0, 1]
+    assert 0 <= features["time_period"] <= 5
 
 
 def test_duration_features_extraction(sample_activities):
@@ -66,20 +66,19 @@ def test_duration_features_extraction(sample_activities):
 
     # Test without previous activity
     features = extractor._extract_duration_features(sample_activities[0])
-    assert features['active_time'] == 60.0
-    assert features['idle_time'] == 30.0
-    assert features['total_time'] == 90.0
-    assert features['transition_time'] == 0
+    assert features["active_time"] == 60.0
+    assert features["idle_time"] == 30.0
+    assert features["total_time"] == 90.0
+    assert features["transition_time"] == 0
 
     # Test with previous activity
     features = extractor._extract_duration_features(
-        sample_activities[1],
-        sample_activities[0]
+        sample_activities[1], sample_activities[0]
     )
-    assert features['active_time'] == 120.0
-    assert features['idle_time'] == 60.0
-    assert features['total_time'] == 180.0
-    assert features['transition_time'] > 0
+    assert features["active_time"] == 120.0
+    assert features["idle_time"] == 60.0
+    assert features["total_time"] == 180.0
+    assert features["transition_time"] > 0
 
 
 def test_app_features_extraction(sample_activities):
@@ -88,12 +87,12 @@ def test_app_features_extraction(sample_activities):
 
     features = extractor._extract_app_features(sample_activities)
 
-    assert 'app_id' in features
-    assert 'app_switch' in features
-    assert len(features['app_id']) == len(sample_activities)
-    assert len(features['app_switch']) == len(sample_activities)
-    assert features['app_switch'][0] == 0  # First activity
-    assert features['app_switch'][1] == 1  # App switch
+    assert "app_id" in features
+    assert "app_switch" in features
+    assert len(features["app_id"]) == len(sample_activities)
+    assert len(features["app_switch"]) == len(sample_activities)
+    assert features["app_switch"][0] == 0  # First activity
+    assert features["app_switch"][1] == 1  # App switch
 
 
 def test_window_features_extraction(sample_activities):
@@ -102,13 +101,13 @@ def test_window_features_extraction(sample_activities):
 
     features = extractor._extract_window_features(sample_activities, window_size=2)
 
-    assert 'active_time_mean' in features
-    assert 'idle_time_mean' in features
-    assert 'activity_rate' in features
-    assert len(features['active_time_mean']) == len(sample_activities)
-    assert len(features['idle_time_mean']) == len(sample_activities)
-    assert len(features['activity_rate']) == len(sample_activities)
-    assert all(0 <= rate <= 1 for rate in features['activity_rate'])
+    assert "active_time_mean" in features
+    assert "idle_time_mean" in features
+    assert "activity_rate" in features
+    assert len(features["active_time_mean"]) == len(sample_activities)
+    assert len(features["idle_time_mean"]) == len(sample_activities)
+    assert len(features["activity_rate"]) == len(sample_activities)
+    assert all(0 <= rate <= 1 for rate in features["activity_rate"])
 
 
 def test_full_feature_extraction(sample_activities):

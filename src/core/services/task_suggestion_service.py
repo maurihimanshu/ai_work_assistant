@@ -6,14 +6,36 @@ from typing import Dict, List, Optional, Tuple
 
 from ..entities.activity import Activity
 from ..events.event_dispatcher import EventDispatcher
-from ..events.event_types import (ActivityEndEvent, ActivityStartEvent,
-                              ProductivityAlertEvent)
+from ..events.event_types import (
+    ActivityEndEvent,
+    ActivityStartEvent,
+    ProductivityAlertEvent,
+)
 from ..interfaces.activity_repository import ActivityRepository
 from ..ml.activity_categorizer import ActivityCategorizer
 from ..ml.continuous_learner import ContinuousLearner
 
 logger = logging.getLogger(__name__)
 
+
+def _convert_to_dict(activity: Activity) -> Dict:
+    """Convert Activity object to dictionary.
+
+    Args:
+        activity: Activity to convert
+
+    Returns:
+        dict: Activity as dictionary
+    """
+    return {
+        "start_time": activity.start_time,
+        "end_time": activity.end_time,
+        "app_name": activity.app_name,
+        "window_title": activity.window_title,
+        "duration": (activity.end_time - activity.start_time).total_seconds() if activity.end_time else 0,
+        "active_time": activity.active_time,
+        "idle_time": activity.idle_time,
+    }
 
 class TaskSuggestionService:
     """Service for analyzing work patterns and suggesting tasks."""
@@ -26,7 +48,7 @@ class TaskSuggestionService:
         learner: ContinuousLearner,
         productivity_threshold: float = 0.7,
         suggestion_interval: timedelta = timedelta(hours=1),
-        analysis_window: timedelta = timedelta(days=7)
+        analysis_window: timedelta = timedelta(days=7),
     ):
         """Initialize task suggestion service.
 
@@ -50,15 +72,10 @@ class TaskSuggestionService:
         self.last_suggestion_time: Optional[datetime] = None
 
         # Subscribe to relevant events
-        self.event_dispatcher.subscribe(
-            self._handle_activity_end,
-            "activity_end"
-        )
+        self.event_dispatcher.subscribe(self._handle_activity_end, "activity_end")
 
     def _get_time_based_suggestions(
-        self,
-        current_time: datetime,
-        recent_activities: List[Activity]
+        self, current_time: datetime, recent_activities: List[Activity]
     ) -> List[str]:
         """Generate time-based task suggestions.
 
@@ -74,42 +91,48 @@ class TaskSuggestionService:
 
         # Morning suggestions (9-11 AM)
         if 9 <= hour < 11:
-            suggestions.extend([
-                "Review your goals for the day",
-                "Tackle your most challenging task first",
-                "Check and respond to important emails"
-            ])
+            suggestions.extend(
+                [
+                    "Review your goals for the day",
+                    "Tackle your most challenging task first",
+                    "Check and respond to important emails",
+                ]
+            )
 
         # Lunch break suggestions (12-2 PM)
         elif 12 <= hour < 14:
-            suggestions.extend([
-                "Take a proper lunch break",
-                "Go for a short walk",
-                "Do some quick stretches"
-            ])
+            suggestions.extend(
+                [
+                    "Take a proper lunch break",
+                    "Go for a short walk",
+                    "Do some quick stretches",
+                ]
+            )
 
         # Afternoon focus (2-5 PM)
         elif 14 <= hour < 17:
-            suggestions.extend([
-                "Focus on completing ongoing tasks",
-                "Schedule any remaining meetings",
-                "Review progress on daily goals"
-            ])
+            suggestions.extend(
+                [
+                    "Focus on completing ongoing tasks",
+                    "Schedule any remaining meetings",
+                    "Review progress on daily goals",
+                ]
+            )
 
         # End of day suggestions (5-7 PM)
         elif 17 <= hour < 19:
-            suggestions.extend([
-                "Plan tasks for tomorrow",
-                "Clear your workspace",
-                "Document any unfinished work"
-            ])
+            suggestions.extend(
+                [
+                    "Plan tasks for tomorrow",
+                    "Clear your workspace",
+                    "Document any unfinished work",
+                ]
+            )
 
         return suggestions
 
     def _get_productivity_based_suggestions(
-        self,
-        productivity_score: float,
-        recent_activities: List[Activity]
+        self, productivity_score: float, recent_activities: List[Activity]
     ) -> List[str]:
         """Generate productivity-based suggestions.
 
@@ -123,23 +146,25 @@ class TaskSuggestionService:
         suggestions = []
 
         if productivity_score < self.productivity_threshold:
+            # Convert activities to dictionaries
+            activity_dicts = [_convert_to_dict(a) for a in recent_activities]
+
             # Analyze patterns
-            categories = self.categorizer.get_activity_insights(
-                recent_activities
-            )
+            categories = self.categorizer.get_activity_insights(activity_dicts)
 
             # Low productivity suggestions
             suggestions.extend([
                 "Take a short break to refresh",
                 "Switch to a different task type",
-                "Set a focused work timer (25 minutes)"
+                "Set a focused work timer (25 minutes)",
             ])
 
             # Add category-specific suggestions
             if categories.get("category_distribution"):
                 low_prod_categories = [
-                    cat for cat, data in categories["category_distribution"].items()
-                    if data["productivity_score"] < self.productivity_threshold
+                    cat
+                    for cat, data in categories["category_distribution"].items()
+                    if data.get("productivity_score", 0) < self.productivity_threshold
                 ]
                 if low_prod_categories:
                     suggestions.append(
@@ -148,10 +173,7 @@ class TaskSuggestionService:
 
         return suggestions
 
-    def _get_pattern_based_suggestions(
-        self,
-        activities: List[Activity]
-    ) -> List[str]:
+    def _get_pattern_based_suggestions(self, activities: List[Activity]) -> List[str]:
         """Get suggestions based on activity patterns.
 
         Args:
@@ -162,43 +184,45 @@ class TaskSuggestionService:
         """
         suggestions = []
 
+        # Convert activities to dictionaries
+        activity_dicts = [_convert_to_dict(a) for a in activities]
+
         # Get next activity prediction
-        next_activity = self.learner.predict_next()
-        if next_activity:
-            suggestions.append(
-                f"Consider switching to {next_activity} based on your usual workflow"
-            )
+        predictions = self.learner.predict_next(activity_dicts)
+        if predictions:
+            for pred in predictions[:2]:  # Only use top 2 predictions
+                if isinstance(pred, dict):
+                    activity_type = pred.get('type', '')
+                    confidence = pred.get('confidence', 0)
+                    if activity_type and confidence > 0.3:
+                        suggestions.append(
+                            f"Consider switching to {activity_type} (confidence: {confidence:.1%})"
+                        )
+                elif isinstance(pred, str):
+                    suggestions.append(f"Consider switching to {pred}")
 
         # Get activity insights
-        insights = self.categorizer.get_activity_insights(activities)
+        insights = self.categorizer.get_activity_insights(activity_dicts)
 
         # Check context switching
         if (
-            'context_switches' in insights and
-            insights['context_switches']['frequency'] == 'high' and
-            insights['context_switches']['impact'] < 0
+            "context_switches" in insights
+            and insights["context_switches"]["frequency"] == "high"
+            and insights["context_switches"]["impact"] < 0
         ):
             suggestions.append(
                 "Consider reducing context switching to improve productivity"
             )
 
         # Check time-based patterns
-        time_productivity = insights.get('time_productivity', {})
+        time_productivity = insights.get("time_productivity", {})
         if time_productivity:
-            most_productive = max(
-                time_productivity.items(),
-                key=lambda x: x[1]
-            )[0]
-            suggestions.append(
-                f"You're most productive during {most_productive} hours"
-            )
+            most_productive = max(time_productivity.items(), key=lambda x: x[1])[0]
+            suggestions.append(f"You're most productive during {most_productive} hours")
 
         return suggestions
 
-    def _get_break_suggestions(
-        self,
-        activities: List[Activity]
-    ) -> List[str]:
+    def _get_break_suggestions(self, activities: List[Activity]) -> List[str]:
         """Get break-related suggestions.
 
         Args:
@@ -211,9 +235,7 @@ class TaskSuggestionService:
 
         # Calculate total work time
         total_work_time = sum(
-            activity.active_time
-            for activity in activities
-            if activity.active_time
+            activity.active_time for activity in activities if activity.active_time
         )
 
         # Suggest breaks based on work duration
@@ -224,8 +246,7 @@ class TaskSuggestionService:
 
         # Check for long sessions without breaks
         continuous_work = any(
-            activity.active_time > 3600  # 1 hour
-            for activity in activities
+            activity.active_time > 3600 for activity in activities  # 1 hour
         )
         if continuous_work:
             suggestions.append(
@@ -242,8 +263,8 @@ class TaskSuggestionService:
         """
         # Check if it's time for new suggestions
         if (
-            not self.last_suggestion_time or
-            event.timestamp - self.last_suggestion_time >= self.suggestion_interval
+            not self.last_suggestion_time
+            or event.timestamp - self.last_suggestion_time >= self.suggestion_interval
         ):
             self._generate_suggestions(event.timestamp)
             self.last_suggestion_time = event.timestamp
@@ -259,45 +280,33 @@ class TaskSuggestionService:
 
             # Get recent activities
             recent_activities = self.repository.get_by_timerange(
-                start_time,
-                current_time
+                start_time, current_time
             )
 
             if not recent_activities:
                 return
 
+            # Convert activities to dictionaries
+            activity_dicts = [_convert_to_dict(a) for a in recent_activities]
+
             # Get productivity score
-            insights = self.categorizer.get_activity_insights(recent_activities)
+            insights = self.categorizer.get_activity_insights(activity_dicts)
             productivity_score = (
-                insights.get("overall_productivity", 0.5)
-                if insights
-                else 0.5
+                insights.get("overall_productivity", 0.5) if insights else 0.5
             )
 
             # Generate suggestions
             suggestions = []
             suggestions.extend(
-                self._get_time_based_suggestions(
-                    current_time,
-                    recent_activities
-                )
+                self._get_time_based_suggestions(current_time, recent_activities)
             )
             suggestions.extend(
                 self._get_productivity_based_suggestions(
-                    productivity_score,
-                    recent_activities
+                    productivity_score, recent_activities
                 )
             )
-            suggestions.extend(
-                self._get_pattern_based_suggestions(
-                    recent_activities
-                )
-            )
-            suggestions.extend(
-                self._get_break_suggestions(
-                    recent_activities
-                )
-            )
+            suggestions.extend(self._get_pattern_based_suggestions(recent_activities))
+            suggestions.extend(self._get_break_suggestions(recent_activities))
 
             # Remove duplicates and limit suggestions
             suggestions = list(dict.fromkeys(suggestions))[:5]
@@ -317,70 +326,78 @@ class TaskSuggestionService:
                         productivity_score=productivity_score,
                         time_window=time_window,
                         suggestions=suggestions,
-                        timestamp=current_time
+                        timestamp=current_time,
                     )
                 )
 
         except Exception as e:
-            logger.error(f"Error generating suggestions: {e}")
+            logger.error(f"Error generating suggestions: {e}", exc_info=True)
 
-    def get_current_suggestions(self) -> Tuple[List[str], float]:
-        """Get current task suggestions and productivity score.
+    def get_current_suggestions(self, time_window: timedelta = None) -> List[str]:
+        """Get current task suggestions.
+
+        Args:
+            time_window: Optional time window to get suggestions for
 
         Returns:
-            tuple: (suggestions, productivity_score)
+            list: List of task suggestions
         """
         try:
-            current_time = datetime.now()
-            start_time = current_time - self.analysis_window
-
             # Get recent activities
+            if time_window is None:
+                time_window = timedelta(hours=1)
+
+            end_time = datetime.now()
+            start_time = end_time - time_window
+
             recent_activities = self.repository.get_by_timerange(
-                start_time,
-                current_time
+                start_time=start_time,
+                end_time=end_time
             )
 
             if not recent_activities:
-                return [], 0.5
+                logger.debug("No recent activities found")
+                return []
 
-            # Get productivity score
-            insights = self.categorizer.get_activity_insights(recent_activities)
-            productivity_score = (
-                insights.get("overall_productivity", 0.5)
-                if insights
-                else 0.5
-            )
+            # Convert activities to dictionaries
+            activity_dicts = [_convert_to_dict(a) for a in recent_activities]
 
-            # Generate suggestions
+            # Get predictions from continuous learner
+            predictions = self.learner.predict_next(activity_dicts)
+
+            # Convert predictions to suggestions
             suggestions = []
-            suggestions.extend(
-                self._get_time_based_suggestions(
-                    current_time,
-                    recent_activities
-                )
-            )
-            suggestions.extend(
-                self._get_productivity_based_suggestions(
-                    productivity_score,
-                    recent_activities
-                )
-            )
-            suggestions.extend(
-                self._get_pattern_based_suggestions(
-                    recent_activities
-                )
-            )
-            suggestions.extend(
-                self._get_break_suggestions(
-                    recent_activities
-                )
-            )
+            for pred in predictions:
+                if isinstance(pred, dict):
+                    activity_type = pred.get('type', '')
+                    confidence = pred.get('confidence', 0)
+                    if activity_type and confidence > 0.3:
+                        suggestions.append(
+                            f"Consider {activity_type} (confidence: {confidence:.1%})"
+                        )
+                elif isinstance(pred, str):
+                    suggestions.append(f"Consider {pred}")
 
-            # Remove duplicates and limit suggestions
+            # If no ML predictions or not enough suggestions, add time-based ones
+            if len(suggestions) < 3:
+                time_suggestions = self._get_time_based_suggestions(end_time, recent_activities)
+                suggestions.extend(time_suggestions)
+
+            # Add productivity-based suggestions if needed
+            if len(suggestions) < 3:
+                activity_dicts = [_convert_to_dict(a) for a in recent_activities]
+                insights = self.categorizer.get_activity_insights(activity_dicts)
+                productivity_score = insights.get("overall_productivity", 0.5)
+                productivity_suggestions = self._get_productivity_based_suggestions(
+                    productivity_score, recent_activities
+                )
+                suggestions.extend(productivity_suggestions)
+
+            # Deduplicate and limit
             suggestions = list(dict.fromkeys(suggestions))[:5]
 
-            return suggestions, productivity_score
+            return suggestions
 
         except Exception as e:
-            logger.error(f"Error getting current suggestions: {e}")
-            return [], 0.5
+            logger.error(f"Error getting current suggestions: {e}", exc_info=True)
+            return []

@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 from ..entities.activity import Activity
 from ..events.event_dispatcher import EventDispatcher
@@ -22,7 +22,7 @@ class AnalyticsService:
         event_dispatcher: EventDispatcher,
         categorizer: Optional[ActivityCategorizer] = None,
         update_interval: timedelta = timedelta(minutes=30),
-        analysis_window: timedelta = timedelta(days=30)
+        analysis_window: timedelta = timedelta(days=30),
     ):
         """Initialize analytics service.
 
@@ -40,90 +40,161 @@ class AnalyticsService:
         self.analysis_window = analysis_window
         self.last_update = None
 
-    def get_productivity_report(
-        self,
-        time_window: Optional[timedelta] = None
-    ) -> Dict[str, Any]:
-        """Get productivity report.
+    def get_productivity_report(self, time_window: timedelta) -> Dict:
+        """Get productivity report for time window.
 
         Args:
-            time_window: Optional custom time window
+            time_window: Time window to get report for
 
         Returns:
-            dict: Productivity report data
+            dict: Report data
         """
         try:
-            current_time = datetime.now()
-            window = time_window or self.analysis_window
-            start_time = current_time - window
-            activities = self.repository.get_by_timerange(start_time, current_time)
+            # Get activities for time window
+            end_time = datetime.now()
+            start_time = end_time - time_window
+            activities = self.repository.get_by_timerange(start_time, end_time)
+
+            logger.info(f"Generating productivity report for {len(activities)} activities")
 
             if not activities:
-                return self._get_empty_report(start_time, current_time)
+                return self._get_empty_report()
 
-            # Calculate metrics
-            total_active_time = sum(a.active_time for a in activities)
-            total_idle_time = sum(a.idle_time for a in activities)
+            # Convert Activity objects to dictionaries
+            activity_dicts = []
+            total_time = 0
+            total_active = 0
+            total_idle = 0
 
-            # Get app patterns
-            app_patterns = self._get_app_patterns(activities)
+            for activity in activities:
+                duration = (activity.end_time - activity.start_time).total_seconds() if activity.end_time else 0
+                activity_dict = {
+                    "start_time": activity.start_time,
+                    "end_time": activity.end_time,
+                    "app_name": activity.app_name,
+                    "window_title": activity.window_title,
+                    "duration": duration,
+                    "active_time": activity.active_time,
+                    "idle_time": activity.idle_time,
+                }
+                activity_dicts.append(activity_dict)
+                total_time += duration
+                total_active += activity.active_time
+                total_idle += activity.idle_time
 
-            # Get behavior patterns
-            behavior_patterns = self._get_behavior_patterns(activities)
+            # Get insights from categorizer
+            insights = self.categorizer.get_activity_insights(activity_dicts)
 
-            # Get daily metrics
-            daily_metrics = self._get_daily_metrics(activities)
+            # Calculate daily metrics
+            daily_metrics = {
+                "total_time": total_time,
+                "active_time": total_active,
+                "idle_time": total_idle,
+            }
 
-            # Get productivity trends
-            productivity_trends = self._get_productivity_trends(activities)
+            # Calculate app patterns
+            app_patterns = {}
+            for activity in activity_dicts:
+                app_name = activity["app_name"]
+                if app_name not in app_patterns:
+                    app_patterns[app_name] = {
+                        "total_time": 0,
+                        "active_time": 0,
+                        "idle_time": 0,
+                        "usage_percentage": 0,
+                    }
+                app_patterns[app_name]["total_time"] += activity["duration"]
+                app_patterns[app_name]["active_time"] += activity["active_time"]
+                app_patterns[app_name]["idle_time"] += activity["idle_time"]
+
+            # Calculate usage percentages
+            if total_time > 0:
+                for app_stats in app_patterns.values():
+                    app_stats["usage_percentage"] = app_stats["total_time"] / total_time
+
+            # Calculate category patterns
+            category_patterns = {}
+            for activity in activity_dicts:
+                category = insights.get("categories", {}).get(activity["app_name"], "Unknown")
+                if category not in category_patterns:
+                    category_patterns[category] = {
+                        "total_time": 0,
+                        "app_count": 0,
+                        "usage_percentage": 0,
+                    }
+                category_patterns[category]["total_time"] += activity["duration"]
+                if activity["app_name"] not in category_patterns[category].get("apps", set()):
+                    category_patterns[category]["app_count"] += 1
+                    category_patterns[category].setdefault("apps", set()).add(activity["app_name"])
+
+            # Calculate category usage percentages
+            if total_time > 0:
+                for cat_stats in category_patterns.values():
+                    cat_stats["usage_percentage"] = cat_stats["total_time"] / total_time
+                    # Remove temporary apps set
+                    cat_stats.pop("apps", None)
+
+            # Calculate productivity trends
+            hourly_trends = [0.0] * 24
+            daily_trends = [0.0] * 7
+            hourly_counts = [0] * 24
+            daily_counts = [0] * 7
+
+            for activity in activity_dicts:
+                start = activity["start_time"]
+                if start and activity["duration"] > 0:
+                    hour = start.hour
+                    day = start.weekday()
+                    productivity = activity["active_time"] / activity["duration"]
+
+                    hourly_trends[hour] = ((hourly_trends[hour] * hourly_counts[hour]) + productivity) / (hourly_counts[hour] + 1)
+                    daily_trends[day] = ((daily_trends[day] * daily_counts[day]) + productivity) / (daily_counts[day] + 1)
+
+                    hourly_counts[hour] += 1
+                    daily_counts[day] += 1
+
+            logger.info("Successfully generated productivity report")
 
             return {
-                "summary": {
-                    "time_period": {
-                        "start": start_time.isoformat(),
-                        "end": current_time.isoformat()
-                    },
-                    "overall_productivity": self._calculate_overall_productivity(activities),
-                    "total_active_time": total_active_time,
-                    "total_idle_time": total_idle_time
-                },
-                "app_patterns": app_patterns,
-                "behavior_patterns": behavior_patterns,
                 "daily_metrics": daily_metrics,
-                "productivity_trends": productivity_trends
+                "app_patterns": app_patterns,
+                "category_patterns": category_patterns,
+                "productivity_trends": {
+                    "hourly": hourly_trends,
+                    "daily": daily_trends,
+                },
+                "activities": activity_dicts,
+                "insights": insights
             }
 
         except Exception as e:
-            logger.error(f"Error generating productivity report: {e}")
-            return self._get_empty_report(
-                datetime.now() - (time_window or self.analysis_window),
-                datetime.now()
-            )
+            logger.error(f"Error generating productivity report: {e}", exc_info=True)
+            return self._get_empty_report()
 
-    def _get_empty_report(self, start_time: datetime, end_time: datetime) -> Dict[str, Any]:
+    def _get_empty_report(self) -> Dict:
         """Get empty report structure.
 
-        Args:
-            start_time: Report start time
-            end_time: Report end time
-
         Returns:
-            dict: Empty report structure
+            dict: Empty report
         """
         return {
-            "summary": {
-                "time_period": {
-                    "start": start_time.isoformat(),
-                    "end": end_time.isoformat()
-                },
-                "overall_productivity": 0.0,
-                "total_active_time": 0.0,
-                "total_idle_time": 0.0
+            "daily_metrics": {
+                "total_time": 0,
+                "active_time": 0,
+                "idle_time": 0,
             },
             "app_patterns": {},
-            "behavior_patterns": [],
-            "daily_metrics": {},
-            "productivity_trends": {}
+            "category_patterns": {},
+            "productivity_trends": {
+                "hourly": [0.0] * 24,
+                "daily": [0.0] * 7,
+            },
+            "activities": [],
+            "insights": {
+                "categories": {},
+                "overall_productivity": 0.0,
+                "suggestions": []
+            }
         }
 
     def update_analytics(self) -> None:
@@ -132,8 +203,10 @@ class AnalyticsService:
             current_time = datetime.now()
 
             # Skip if last update was too recent
-            if (self.last_update and
-                current_time - self.last_update < self.update_interval):
+            if (
+                self.last_update
+                and current_time - self.last_update < self.update_interval
+            ):
                 return
 
             # Get activities since last update
@@ -150,13 +223,13 @@ class AnalyticsService:
 
                 # Dispatch events for significant patterns
                 for pattern in patterns:
-                    if pattern['significance'] > 0.5:  # Only significant patterns
+                    if pattern["significance"] > 0.5:  # Only significant patterns
                         self.event_dispatcher.dispatch(
                             BehaviorPatternEvent(
-                                pattern_type=pattern['type'],
-                                pattern_data=pattern['details'],
-                                significance=pattern['significance'],
-                                timestamp=current_time
+                                pattern_type=pattern["type"],
+                                pattern_data=pattern["details"],
+                                significance=pattern["significance"],
+                                timestamp=current_time,
                             )
                         )
 
@@ -178,14 +251,20 @@ class AnalyticsService:
         if not activities:
             return 0.0
 
-        total_time = sum((a.end_time - a.start_time).total_seconds() for a in activities if a.end_time)
+        total_time = sum(
+            (a.end_time - a.start_time).total_seconds()
+            for a in activities
+            if a.end_time
+        )
         if total_time == 0:
             return 0.0
 
         total_productive_time = sum(a.active_time for a in activities if a.end_time)
         return total_productive_time / total_time
 
-    def _get_app_patterns(self, activities: List[Activity]) -> Dict[str, Dict[str, float]]:
+    def _get_app_patterns(
+        self, activities: List[Activity]
+    ) -> Dict[str, Dict[str, float]]:
         """Get application usage patterns.
 
         Args:
@@ -201,28 +280,30 @@ class AnalyticsService:
             app_name = activity.app_name
             if app_name not in app_patterns:
                 app_patterns[app_name] = {
-                    'total_time': 0.0,
-                    'active_time': 0.0,
-                    'idle_time': 0.0
+                    "total_time": 0.0,
+                    "active_time": 0.0,
+                    "idle_time": 0.0,
                 }
 
-            app_patterns[app_name]['total_time'] += (
+            app_patterns[app_name]["total_time"] += (
                 activity.active_time + activity.idle_time
             )
-            app_patterns[app_name]['active_time'] += activity.active_time
-            app_patterns[app_name]['idle_time'] += activity.idle_time
+            app_patterns[app_name]["active_time"] += activity.active_time
+            app_patterns[app_name]["idle_time"] += activity.idle_time
             total_time += activity.active_time + activity.idle_time
 
         # Calculate percentages
         if total_time > 0:
             for app_name in app_patterns:
-                app_patterns[app_name]['usage_percentage'] = (
-                    app_patterns[app_name]['total_time'] / total_time
+                app_patterns[app_name]["usage_percentage"] = (
+                    app_patterns[app_name]["total_time"] / total_time
                 )
 
         return app_patterns
 
-    def _get_behavior_patterns(self, activities: List[Activity]) -> List[Dict[str, Any]]:
+    def _get_behavior_patterns(
+        self, activities: List[Activity]
+    ) -> List[Dict[str, Any]]:
         """Get significant behavior patterns.
 
         Args:
@@ -236,18 +317,20 @@ class AnalyticsService:
         # Analyze context switching
         app_switches = 0
         for i in range(1, len(activities)):
-            if activities[i].app_name != activities[i-1].app_name:
+            if activities[i].app_name != activities[i - 1].app_name:
                 app_switches += 1
 
         if app_switches > len(activities) * 0.3:  # High context switching
-            patterns.append({
-                'type': 'context_switching',
-                'details': {
-                    'switches': app_switches,
-                    'total_activities': len(activities)
-                },
-                'significance': min(1.0, app_switches / len(activities))
-            })
+            patterns.append(
+                {
+                    "type": "context_switching",
+                    "details": {
+                        "switches": app_switches,
+                        "total_activities": len(activities),
+                    },
+                    "significance": min(1.0, app_switches / len(activities)),
+                }
+            )
 
         # Analyze work patterns
         work_sessions = []
@@ -256,7 +339,9 @@ class AnalyticsService:
         for activity in activities:
             if not current_session:
                 current_session = [activity]
-            elif (activity.start_time - current_session[-1].end_time).total_seconds() < 300:  # 5 min gap
+            elif (
+                activity.start_time - current_session[-1].end_time
+            ).total_seconds() < 300:  # 5 min gap
                 current_session.append(activity)
             else:
                 if len(current_session) > 3:  # Significant session
@@ -267,21 +352,26 @@ class AnalyticsService:
             work_sessions.append(current_session)
 
         if work_sessions:
-            patterns.append({
-                'type': 'work_sessions',
-                'details': {
-                    'count': len(work_sessions),
-                    'avg_duration': sum(
-                        (s[-1].end_time - s[0].start_time).total_seconds()
-                        for s in work_sessions
-                    ) / len(work_sessions)
-                },
-                'significance': min(1.0, len(work_sessions) * 0.2)
-            })
+            patterns.append(
+                {
+                    "type": "work_sessions",
+                    "details": {
+                        "count": len(work_sessions),
+                        "avg_duration": sum(
+                            (s[-1].end_time - s[0].start_time).total_seconds()
+                            for s in work_sessions
+                        )
+                        / len(work_sessions),
+                    },
+                    "significance": min(1.0, len(work_sessions) * 0.2),
+                }
+            )
 
         return patterns
 
-    def _get_daily_metrics(self, activities: List[Activity]) -> Dict[str, Dict[str, float]]:
+    def _get_daily_metrics(
+        self, activities: List[Activity]
+    ) -> Dict[str, Dict[str, float]]:
         """Get daily productivity metrics.
 
         Args:
@@ -296,28 +386,29 @@ class AnalyticsService:
             date = activity.start_time.date().isoformat()
             if date not in daily_metrics:
                 daily_metrics[date] = {
-                    'active_time': 0.0,
-                    'idle_time': 0.0,
-                    'productivity': 0.0
+                    "active_time": 0.0,
+                    "idle_time": 0.0,
+                    "productivity": 0.0,
                 }
 
-            daily_metrics[date]['active_time'] += activity.active_time
-            daily_metrics[date]['idle_time'] += activity.idle_time
+            daily_metrics[date]["active_time"] += activity.active_time
+            daily_metrics[date]["idle_time"] += activity.idle_time
 
         # Calculate productivity
         for date in daily_metrics:
             total_time = (
-                daily_metrics[date]['active_time'] +
-                daily_metrics[date]['idle_time']
+                daily_metrics[date]["active_time"] + daily_metrics[date]["idle_time"]
             )
             if total_time > 0:
-                daily_metrics[date]['productivity'] = (
-                    daily_metrics[date]['active_time'] / total_time
+                daily_metrics[date]["productivity"] = (
+                    daily_metrics[date]["active_time"] / total_time
                 )
 
         return daily_metrics
 
-    def _get_productivity_trends(self, activities: List[Activity]) -> Dict[str, List[float]]:
+    def _get_productivity_trends(
+        self, activities: List[Activity]
+    ) -> Dict[str, List[float]]:
         """Get productivity trends.
 
         Args:
@@ -326,10 +417,7 @@ class AnalyticsService:
         Returns:
             dict: Productivity trends
         """
-        trends = {
-            'hourly': [0.0] * 24,
-            'daily': [0.0] * 7
-        }
+        trends = {"hourly": [0.0] * 24, "daily": [0.0] * 7}
 
         hour_counts = [0] * 24
         day_counts = [0] * 7
@@ -341,18 +429,18 @@ class AnalyticsService:
             total_time = activity.active_time + activity.idle_time
             if total_time > 0:
                 productivity = activity.active_time / total_time
-                trends['hourly'][hour] += productivity
-                trends['daily'][day] += productivity
+                trends["hourly"][hour] += productivity
+                trends["daily"][day] += productivity
                 hour_counts[hour] += 1
                 day_counts[day] += 1
 
         # Calculate averages
         for hour in range(24):
             if hour_counts[hour] > 0:
-                trends['hourly'][hour] /= hour_counts[hour]
+                trends["hourly"][hour] /= hour_counts[hour]
 
         for day in range(7):
             if day_counts[day] > 0:
-                trends['daily'][day] /= day_counts[day]
+                trends["daily"][day] /= day_counts[day]
 
         return trends

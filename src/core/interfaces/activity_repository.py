@@ -36,9 +36,7 @@ class ActivityRepository(ABC):
 
     @abstractmethod
     def get_by_timerange(
-        self, 
-        start_time: datetime, 
-        end_time: datetime
+        self, start_time: datetime, end_time: datetime
     ) -> List[Activity]:
         """Retrieve activities within a time range.
 

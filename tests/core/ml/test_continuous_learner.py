@@ -24,10 +24,10 @@ def sample_activities():
             window_title=f"window_{i}",
             process_id=i,
             executable_path=f"/path/to/app_{i % 2}",
-            start_time=now + timedelta(minutes=i*5)
+            start_time=now + timedelta(minutes=i * 5),
         )
         activity.active_time = float(60)  # 1 minute active
-        activity.idle_time = float(30)    # 30 seconds idle
+        activity.idle_time = float(30)  # 30 seconds idle
         activity.end_time = activity.start_time + timedelta(
             seconds=activity.active_time + activity.idle_time
         )
@@ -43,7 +43,7 @@ def learner():
         window_size=50,
         adaptation_rate=0.3,
         min_samples_adapt=10,
-        performance_threshold=0.7
+        performance_threshold=0.7,
     )
 
 
@@ -94,7 +94,7 @@ def test_should_adapt_performance_degradation(learner):
         window_title="Test Window",
         process_id=1234,
         executable_path="/path/to/test",
-        start_time=datetime.now()
+        start_time=datetime.now(),
     )
 
     for _ in range(20):
@@ -164,7 +164,7 @@ def test_predict_next_success(learner, sample_activities):
 
     prediction = learner.predict_next(sample_activities[20:25])
 
-    assert prediction in ['app_0', 'app_1']
+    assert prediction in ["app_0", "app_1"]
 
 
 def test_predict_next_no_data(learner):
@@ -185,15 +185,15 @@ def test_get_performance_stats(learner):
 
     stats = learner.get_performance_stats()
 
-    assert 'current_accuracy' in stats
-    assert 'average_accuracy' in stats
-    assert 'min_accuracy' in stats
-    assert 'max_accuracy' in stats
-    assert 'adaptation_count' in stats
-    assert stats['current_accuracy'] == 0.9
-    assert stats['min_accuracy'] == 0.8
-    assert stats['max_accuracy'] == 0.9
-    assert stats['adaptation_count'] == 3
+    assert "current_accuracy" in stats
+    assert "average_accuracy" in stats
+    assert "min_accuracy" in stats
+    assert "max_accuracy" in stats
+    assert "adaptation_count" in stats
+    assert stats["current_accuracy"] == 0.9
+    assert stats["min_accuracy"] == 0.8
+    assert stats["max_accuracy"] == 0.9
+    assert stats["adaptation_count"] == 3
 
 
 def test_continuous_learning_cycle(learner, sample_activities):

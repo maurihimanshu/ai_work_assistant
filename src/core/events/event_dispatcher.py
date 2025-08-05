@@ -1,11 +1,11 @@
 """Event dispatcher system for handling and distributing events."""
 
 import logging
+import time
 from collections import defaultdict
 from dataclasses import is_dataclass
 from threading import Lock, RLock
 from typing import Any, Callable, Dict, List, Optional, Set, Union
-import time
 
 from .event_types import (
     ActivityEndEvent,
@@ -17,7 +17,7 @@ from .event_types import (
     IdleStartEvent,
     ProductivityAlertEvent,
     SessionEvent,
-    SystemStatusEvent
+    SystemStatusEvent,
 )
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,7 @@ Event = Union[
     SessionEvent,
     SystemStatusEvent,
     ErrorEvent,
-    ConfigurationChangeEvent
+    ConfigurationChangeEvent,
 ]
 
 
@@ -80,7 +80,7 @@ class HandlerError:
 
         # Wait longer between retries
         if self.error_count > 0:
-            wait_time = min(300, 2 ** self.error_count)  # Max 5 minutes
+            wait_time = min(300, 2**self.error_count)  # Max 5 minutes
             if time.time() - self.last_error_time < wait_time:
                 return False
 
@@ -106,16 +106,14 @@ class EventDispatcher:
 
         # Locks for thread safety
         self._handlers_lock = RLock()  # Reentrant lock for handler operations
-        self._history_lock = Lock()    # Lock for event history operations
+        self._history_lock = Lock()  # Lock for event history operations
 
         # Error tracking
         self._handler_errors: Dict[Callable, HandlerError] = {}
         self._errors_lock = Lock()
 
     def subscribe(
-        self,
-        handler: Callable[[Event], None],
-        event_type: Optional[str] = None
+        self, handler: Callable[[Event], None], event_type: Optional[str] = None
     ) -> None:
         """Subscribe to events.
 
@@ -130,9 +128,7 @@ class EventDispatcher:
                 self._global_handlers.add(handler)
 
     def unsubscribe(
-        self,
-        handler: Callable[[Event], None],
-        event_type: Optional[str] = None
+        self, handler: Callable[[Event], None], event_type: Optional[str] = None
     ) -> None:
         """Unsubscribe from events.
 
@@ -154,9 +150,7 @@ class EventDispatcher:
                 del self._handler_errors[handler]
 
     def _get_handler_error(
-        self,
-        handler: Callable,
-        event_type: Optional[str]
+        self, handler: Callable, event_type: Optional[str]
     ) -> HandlerError:
         """Get or create handler error tracking.
 
@@ -177,8 +171,8 @@ class EventDispatcher:
         handler: Callable,
         event: Event,
         event_type: Optional[str] = None,
-        is_error_handler: bool = False
-    ) -> None:
+        is_error_handler: bool = False,
+    ) -> bool:
         """Call a handler with error tracking and retry logic.
 
         Args:
@@ -202,7 +196,7 @@ class EventDispatcher:
             logger.error(
                 f"Error in handler {handler.__name__} for "
                 f"{event_type or 'global'}: {e}",
-                exc_info=True
+                exc_info=True,
             )
 
             # Only disable handler after max retries
@@ -222,8 +216,8 @@ class EventDispatcher:
                         details={
                             "handler": handler.__name__,
                             "event_type": event_type,
-                            "error": str(e)
-                        }
+                            "error": str(e),
+                        },
                     )
 
                     # Call error handlers directly without validation
@@ -236,13 +230,10 @@ class EventDispatcher:
                                 error_handler,
                                 error_event,
                                 "error",
-                                is_error_handler=True
+                                is_error_handler=True,
                             )
                         except Exception as e2:
-                            logger.error(
-                                f"Error in error handler: {e2}",
-                                exc_info=True
-                            )
+                            logger.error(f"Error in error handler: {e2}", exc_info=True)
 
                     # Add error event to history after handlers are called
                     with self._history_lock:
@@ -252,8 +243,7 @@ class EventDispatcher:
 
                 except Exception as e2:
                     logger.error(
-                        f"Error creating/dispatching error event: {e2}",
-                        exc_info=True
+                        f"Error creating/dispatching error event: {e2}", exc_info=True
                     )
 
             return False
@@ -274,7 +264,7 @@ class EventDispatcher:
                 raise TypeError("Event must be a dataclass")
 
             # Use validation mixin
-            event.validate()  # type: ignore
+            event.validate()
 
             # Add to history with thread safety
             with self._history_lock:
@@ -298,27 +288,21 @@ class EventDispatcher:
 
         except (TypeError, ValueError) as e:
             # Log validation errors but don't create error events for them
-            logger.error(
-                f"Event validation error: {e}",
-                exc_info=True
-            )
+            logger.error(f"Event validation error: {e}", exc_info=True)
             raise  # Re-raise validation errors
 
         except Exception as e:
-            logger.error(
-                f"Error dispatching event: {e}",
-                exc_info=True
-            )
+            logger.error(f"Error dispatching event: {e}", exc_info=True)
             # Only create error events for non-validation errors
             try:
                 error_event = ErrorEvent(
                     error_type="dispatch_error",
                     error_message=str(e),
-                    timestamp=event.timestamp,  # type: ignore
+                    timestamp=event.timestamp,
                     details={
                         "event_type": getattr(event, "event_type", None),
-                        "error": str(e)
-                    }
+                        "error": str(e),
+                    },
                 )
 
                 # Call error handlers directly without validation
@@ -328,16 +312,10 @@ class EventDispatcher:
                 for handler in error_handlers:
                     try:
                         self._call_handler(
-                            handler,
-                            error_event,
-                            "error",
-                            is_error_handler=True
+                            handler, error_event, "error", is_error_handler=True
                         )
                     except Exception as e2:
-                        logger.error(
-                            f"Error in error handler: {e2}",
-                            exc_info=True
-                        )
+                        logger.error(f"Error in error handler: {e2}", exc_info=True)
 
                 # Add error event to history after handlers are called
                 with self._history_lock:
@@ -347,14 +325,11 @@ class EventDispatcher:
 
             except Exception as e2:
                 logger.error(
-                    f"Error creating/dispatching error event: {e2}",
-                    exc_info=True
+                    f"Error creating/dispatching error event: {e2}", exc_info=True
                 )
 
     def get_recent_events(
-        self,
-        event_type: Optional[str] = None,
-        limit: int = 100
+        self, event_type: Optional[str] = None, limit: int = 100
     ) -> List[Event]:
         """Get recent events from history.
 
@@ -367,10 +342,7 @@ class EventDispatcher:
         """
         with self._history_lock:
             if event_type:
-                events = [
-                    e for e in self._event_history
-                    if e.event_type == event_type
-                ]
+                events = [e for e in self._event_history if e.event_type == event_type]
             else:
                 events = self._event_history.copy()
 
@@ -395,8 +367,10 @@ class EventDispatcher:
                     "handler": handler.__name__,
                     "error_count": error_info.error_count,
                     "last_error_time": error_info.last_error_time,
-                    "last_error": str(error_info.last_error) if error_info.last_error else None,
-                    "disabled": error_info.disabled
+                    "last_error": str(error_info.last_error)
+                    if error_info.last_error
+                    else None,
+                    "disabled": error_info.disabled,
                 }
 
                 event_type = error_info.event_type or "global"
@@ -439,18 +413,9 @@ class ActivityEventHandler(EventHandler):
 
     def _register_handlers(self) -> None:
         """Register activity event handlers."""
-        self.dispatcher.subscribe(
-            self.handle_event,
-            "activity_start"
-        )
-        self.dispatcher.subscribe(
-            self.handle_event,
-            "activity_end"
-        )
-        self.subscribed_events.update([
-            "activity_start",
-            "activity_end"
-        ])
+        self.dispatcher.subscribe(self.handle_event, "activity_start")
+        self.dispatcher.subscribe(self.handle_event, "activity_end")
+        self.subscribed_events.update(["activity_start", "activity_end"])
 
     def handle_event(self, event: Event) -> None:
         """Handle activity events.
@@ -469,9 +434,7 @@ class ActivityEventHandler(EventHandler):
         Args:
             event: Activity start event
         """
-        logger.info(
-            f"Activity started: {event.activity.app_name}"
-        )
+        logger.info(f"Activity started: {event.activity.app_name}")
 
     def _handle_activity_end(self, event: ActivityEndEvent) -> None:
         """Handle activity end event.
@@ -490,10 +453,7 @@ class ProductivityEventHandler(EventHandler):
 
     def _register_handlers(self) -> None:
         """Register productivity event handlers."""
-        self.dispatcher.subscribe(
-            self.handle_event,
-            "productivity_alert"
-        )
+        self.dispatcher.subscribe(self.handle_event, "productivity_alert")
         self.subscribed_events.add("productivity_alert")
 
     def handle_event(self, event: Event) -> None:
@@ -524,18 +484,9 @@ class SystemEventHandler(EventHandler):
 
     def _register_handlers(self) -> None:
         """Register system event handlers."""
-        self.dispatcher.subscribe(
-            self.handle_event,
-            "system_status"
-        )
-        self.dispatcher.subscribe(
-            self.handle_event,
-            "error"
-        )
-        self.subscribed_events.update([
-            "system_status",
-            "error"
-        ])
+        self.dispatcher.subscribe(self.handle_event, "system_status")
+        self.dispatcher.subscribe(self.handle_event, "error")
+        self.subscribed_events.update(["system_status", "error"])
 
     def handle_event(self, event: Event) -> None:
         """Handle system events.
@@ -564,8 +515,6 @@ class SystemEventHandler(EventHandler):
         Args:
             event: Error event
         """
-        logger.error(
-            f"System error ({event.error_type}): {event.error_message}"
-        )
+        logger.error(f"System error ({event.error_type}): {event.error_message}")
         if event.details:
             logger.error(f"Error details: {event.details}")
