@@ -6,10 +6,10 @@ import os
 import shutil
 import sys
 import time
+import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Generator, List, Optional, Dict
-import uuid
+from typing import Dict, Generator, List, Optional
 
 import pytest
 from PyQt6.QtCore import Qt, QTimer
@@ -54,23 +54,18 @@ class MockRepository(ActivityRepository):
         return list(self.activities.values())
 
     def get_by_timerange(
-        self,
-        start_time: datetime,
-        end_time: datetime
+        self, start_time: datetime, end_time: datetime
     ) -> List[Activity]:
         """Get activities in time range."""
         return [
-            a for a in self.activities.values()
-            if a.start_time >= start_time and
-            (not a.end_time or a.end_time <= end_time)
+            a
+            for a in self.activities.values()
+            if a.start_time >= start_time and (not a.end_time or a.end_time <= end_time)
         ]
 
     def get_by_app(self, app_name: str) -> List[Activity]:
         """Get activities by app name."""
-        return [
-            a for a in self.activities.values()
-            if a.app_name == app_name
-        ]
+        return [a for a in self.activities.values() if a.app_name == app_name]
 
     def update(self, activity: Activity) -> bool:
         """Update an activity."""
@@ -86,16 +81,12 @@ class MockRepository(ActivityRepository):
         del self.activities[activity_id]
         return True
 
-    def delete_by_timerange(
-        self,
-        start_time: datetime,
-        end_time: datetime
-    ) -> None:
+    def delete_by_timerange(self, start_time: datetime, end_time: datetime) -> None:
         """Delete activities in time range."""
         to_delete = [
-            aid for aid, a in self.activities.items()
-            if a.start_time >= start_time and
-            (not a.end_time or a.end_time <= end_time)
+            aid
+            for aid, a in self.activities.items()
+            if a.start_time >= start_time and (not a.end_time or a.end_time <= end_time)
         ]
         for aid in to_delete:
             del self.activities[aid]
@@ -103,8 +94,7 @@ class MockRepository(ActivityRepository):
     def cleanup_old_activities(self, before_date: datetime) -> int:
         """Delete activities older than the specified date."""
         to_delete = [
-            aid for aid, a in self.activities.items()
-            if a.start_time < before_date
+            aid for aid, a in self.activities.items() if a.start_time < before_date
         ]
         for aid in to_delete:
             del self.activities[aid]
@@ -145,28 +135,19 @@ def test_dir(tmp_path) -> Path:
 
     # Create default config
     config = {
-        "session": {
-            "inactivity_timeout": 30,
-            "auto_start": False
-        },
+        "session": {"inactivity_timeout": 30, "auto_start": False},
         "notifications": {
             "show_productivity_alerts": True,
             "show_suggestions": True,
-            "duration": 5
+            "duration": 5,
         },
         "privacy": {
             "data_retention_days": 30,
             "collect_app_usage": True,
-            "collect_window_titles": False
+            "collect_window_titles": False,
         },
-        "analytics": {
-            "productivity_threshold": 70,
-            "analysis_window_days": 7
-        },
-        "ml": {
-            "enable_predictions": True,
-            "prediction_confidence": 80
-        }
+        "analytics": {"productivity_threshold": 70, "analysis_window_days": 7},
+        "ml": {"enable_predictions": True, "prediction_confidence": 80},
     }
 
     config_path = config_dir / "settings.json"
@@ -188,33 +169,28 @@ def app_instance(test_app, test_dir, mock_repository):
     session_service = SessionService(
         repository=mock_repository,
         event_dispatcher=dispatcher,
-        session_dir=str(test_dir / "sessions")
+        session_dir=str(test_dir / "sessions"),
     )
 
     analytics_service = AnalyticsService(
-        repository=mock_repository,
-        event_dispatcher=dispatcher,
-        categorizer=None
+        repository=mock_repository, event_dispatcher=dispatcher, categorizer=None
     )
 
     suggestion_service = TaskSuggestionService(
         repository=mock_repository,
         event_dispatcher=dispatcher,
         categorizer=None,
-        learner=None
+        learner=None,
     )
 
-    monitor = ActivityMonitor(
-        repository=mock_repository,
-        event_dispatcher=dispatcher
-    )
+    monitor = ActivityMonitor(repository=mock_repository, event_dispatcher=dispatcher)
 
     # Create UI
     tray = SystemTrayApp(
         session_service=session_service,
         analytics_service=analytics_service,
         suggestion_service=suggestion_service,
-        event_dispatcher=dispatcher
+        event_dispatcher=dispatcher,
     )
 
     return {
@@ -223,7 +199,7 @@ def app_instance(test_app, test_dir, mock_repository):
         "analytics_service": analytics_service,
         "suggestion_service": suggestion_service,
         "monitor": monitor,
-        "tray": tray
+        "tray": tray,
     }
 
 
@@ -303,7 +279,7 @@ def test_activity_tracking(test_app, app_instance, qtbot):
         start_time=current_time,
         end_time=current_time + timedelta(minutes=1),
         active_time=55,
-        idle_time=5
+        idle_time=5,
     )
 
     # Track activity
@@ -321,9 +297,7 @@ def test_analytics_workflow(test_app, app_instance, qtbot):
     analytics = app_instance["analytics_service"]
 
     # Get initial report
-    initial_report = analytics.get_productivity_report(
-        time_window=timedelta(days=1)
-    )
+    initial_report = analytics.get_productivity_report(time_window=timedelta(days=1))
     assert initial_report is not None
 
     # Add test activity
@@ -336,14 +310,12 @@ def test_analytics_workflow(test_app, app_instance, qtbot):
         start_time=current_time - timedelta(minutes=30),
         end_time=current_time,
         active_time=1500,
-        idle_time=300
+        idle_time=300,
     )
     analytics.repository.save(activity)
 
     # Get updated report
-    updated_report = analytics.get_productivity_report(
-        time_window=timedelta(days=1)
-    )
+    updated_report = analytics.get_productivity_report(time_window=timedelta(days=1))
     assert updated_report != initial_report
 
 
@@ -366,7 +338,7 @@ def test_suggestion_workflow(test_app, app_instance, qtbot):
         start_time=current_time - timedelta(minutes=30),
         end_time=current_time,
         active_time=1500,
-        idle_time=300
+        idle_time=300,
     )
     suggestion.repository.save(activity)
 
@@ -385,10 +357,7 @@ def test_session_workflow(test_app, app_instance, qtbot):
     assert session.current_session_id == session_id
 
     # Update session state
-    session.update_session_state(
-        "test_app",
-        {"window": "main", "position": [100, 100]}
-    )
+    session.update_session_state("test_app", {"window": "main", "position": [100, 100]})
 
     # Get recent sessions
     recent = session.get_recent_sessions()
@@ -447,10 +416,7 @@ def test_data_persistence(test_app, app_instance, test_dir):
 
     # Create test data
     session_id = session.start_session()
-    session.update_session_state(
-        "test_app",
-        {"state": "test"}
-    )
+    session.update_session_state("test_app", {"state": "test"})
     session.end_session()
 
     # Verify file creation
@@ -474,6 +440,7 @@ def test_system_integration(test_app, app_instance, qtbot):
 
     # Track event propagation
     received_events = []
+
     def event_handler(event):
         received_events.append(event)
 
@@ -492,7 +459,7 @@ def test_system_integration(test_app, app_instance, qtbot):
         start_time=current_time,
         end_time=current_time + timedelta(minutes=1),
         active_time=55,
-        idle_time=5
+        idle_time=5,
     )
 
     # Track activity
@@ -504,9 +471,7 @@ def test_system_integration(test_app, app_instance, qtbot):
     assert len(received_events) >= 2  # At least start and end events
 
     # Verify analytics update
-    report = analytics.get_productivity_report(
-        time_window=timedelta(days=1)
-    )
+    report = analytics.get_productivity_report(time_window=timedelta(days=1))
     assert report is not None
 
     # Verify suggestions update

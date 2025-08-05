@@ -27,10 +27,10 @@ def sample_activities():
             window_title=f"window_{i}",
             process_id=i,
             executable_path=f"/path/to/app_{i % 2}",
-            start_time=now + timedelta(minutes=i*5)
+            start_time=now + timedelta(minutes=i * 5),
         )
         activity.active_time = float(60)  # 1 minute active
-        activity.idle_time = float(30)    # 30 seconds idle
+        activity.idle_time = float(30)  # 30 seconds idle
         activity.end_time = activity.start_time + timedelta(
             seconds=activity.active_time + activity.idle_time
         )
@@ -58,10 +58,10 @@ def test_model_training(model_manager, sample_activities):
     metrics = model_manager.train_model(sample_activities)
 
     assert isinstance(metrics, dict)
-    assert 'accuracy' in metrics
-    assert 'precision' in metrics
-    assert 'recall' in metrics
-    assert 'f1_score' in metrics
+    assert "accuracy" in metrics
+    assert "precision" in metrics
+    assert "recall" in metrics
+    assert "f1_score" in metrics
     assert all(0 <= v <= 1 for v in metrics.values())
 
     # Verify model was saved
@@ -77,7 +77,7 @@ def test_model_prediction(model_manager, sample_activities):
 
     # Test prediction with recent activities
     prediction = model_manager.predict_next_activity(sample_activities[-3:])
-    assert prediction in ['app_0', 'app_1']
+    assert prediction in ["app_0", "app_1"]
 
 
 def test_model_persistence(sample_activities):
@@ -101,10 +101,10 @@ def test_model_evaluation(model_manager, sample_activities):
     """Test model evaluation metrics."""
     metrics = model_manager.train_model(sample_activities)
 
-    assert metrics['accuracy'] > 0
-    assert metrics['precision'] > 0
-    assert metrics['recall'] > 0
-    assert metrics['f1_score'] > 0
+    assert metrics["accuracy"] > 0
+    assert metrics["precision"] > 0
+    assert metrics["recall"] > 0
+    assert metrics["f1_score"] > 0
 
 
 def test_empty_activities_handling(model_manager):
@@ -122,11 +122,11 @@ def test_model_info(model_manager, sample_activities):
     model_manager.train_model(sample_activities)
     info = model_manager.get_model_info()
 
-    assert 'trained_at' in info
-    assert 'n_samples' in info
-    assert 'feature_names' in info
-    assert 'metrics' in info
-    assert 'parameters' in info
+    assert "trained_at" in info
+    assert "n_samples" in info
+    assert "feature_names" in info
+    assert "metrics" in info
+    assert "parameters" in info
 
 
 def test_prediction_without_model(model_manager, sample_activities):
@@ -147,8 +147,8 @@ def test_model_metadata_format(model_manager, sample_activities):
     with open(meta_files[0]) as f:
         metadata = json.load(f)
 
-    assert isinstance(metadata['trained_at'], str)
-    assert isinstance(metadata['n_samples'], int)
-    assert isinstance(metadata['feature_names'], list)
-    assert isinstance(metadata['metrics'], dict)
-    assert isinstance(metadata['parameters'], dict)
+    assert isinstance(metadata["trained_at"], str)
+    assert isinstance(metadata["n_samples"], int)
+    assert isinstance(metadata["feature_names"], list)
+    assert isinstance(metadata["metrics"], dict)
+    assert isinstance(metadata["parameters"], dict)

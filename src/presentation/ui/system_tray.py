@@ -1,23 +1,32 @@
 """System tray application for the AI Work Assistant."""
 
 import logging
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Dict, Optional
 
-from PyQt6.QtCore import QTimer, Qt, pyqtSlot
+from PyQt6.QtCore import Qt, QTimer, pyqtSlot
 from PyQt6.QtGui import QAction, QIcon
-from PyQt6.QtWidgets import (QApplication, QMenu, QMessageBox, QStyle,
-                            QSystemTrayIcon)
+from PyQt6.QtWidgets import QApplication, QMenu, QMessageBox, QStyle, QSystemTrayIcon
 
-from ...core.events.event_dispatcher import EventDispatcher
-from ...core.events.event_types import ProductivityAlertEvent, SessionEvent
-from ...core.services.analytics_service import AnalyticsService
-from ...core.services.session_service import SessionService
-from ...core.services.task_suggestion_service import TaskSuggestionService
-from .dashboard import Dashboard
-from .settings_dialog import SettingsDialog
+# Add the parent directory to Python path to make the src package importable
+parent_dir = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+from core.events.event_dispatcher import EventDispatcher
+from core.events.event_types import ProductivityAlertEvent, SessionEvent
+from core.services.analytics_service import AnalyticsService
+from core.services.session_service import SessionService
+from core.services.task_suggestion_service import TaskSuggestionService
+from core.services.activity_monitor import ActivityMonitor
+from presentation.ui.dashboard import Dashboard
+from presentation.ui.settings_dialog import SettingsDialog
+from core.events.event_types import SystemStatusEvent
 
 logger = logging.getLogger(__name__)
 
@@ -27,16 +36,18 @@ class SystemTrayApp(QSystemTrayIcon):
 
     def __init__(
         self,
+        activity_monitor: ActivityMonitor,
         session_service: SessionService,
         analytics_service: AnalyticsService,
         suggestion_service: TaskSuggestionService,
         event_dispatcher: EventDispatcher,
         icon_path: Optional[str] = None,
-        parent=None
+        parent=None,
     ):
         """Initialize system tray application.
 
         Args:
+            activity_monitor: Activity monitoring service
             session_service: Service for managing work sessions
             analytics_service: Service for analytics
             suggestion_service: Service for task suggestions
@@ -47,6 +58,7 @@ class SystemTrayApp(QSystemTrayIcon):
         super().__init__(parent)
 
         # Services
+        self.activity_monitor = activity_monitor
         self.session_service = session_service
         self.analytics_service = analytics_service
         self.suggestion_service = suggestion_service
@@ -67,7 +79,7 @@ class SystemTrayApp(QSystemTrayIcon):
             "AI Work Assistant",
             "Assistant is running in the background",
             QSystemTrayIcon.MessageIcon.Information,
-            3000
+            3000,
         )
 
     def _setup_ui(self, icon_path: Optional[str]) -> None:
@@ -84,9 +96,7 @@ class SystemTrayApp(QSystemTrayIcon):
             app = QApplication.instance()
             if app:
                 self.setIcon(
-                    app.style().standardIcon(
-                        QStyle.StandardPixmap.SP_ComputerIcon
-                    )
+                    app.style().standardIcon(QStyle.StandardPixmap.SP_ComputerIcon)
                 )
             else:
                 # Fallback to a simple icon
@@ -133,17 +143,10 @@ class SystemTrayApp(QSystemTrayIcon):
         """Set up event handlers."""
         # Subscribe to events
         self.event_dispatcher.subscribe(
-            self._handle_productivity_alert,
-            "productivity_alert"
+            self._handle_productivity_alert, "productivity_alert"
         )
-        self.event_dispatcher.subscribe(
-            self._handle_session_event,
-            "session_start"
-        )
-        self.event_dispatcher.subscribe(
-            self._handle_session_event,
-            "session_end"
-        )
+        self.event_dispatcher.subscribe(self._handle_session_event, "session_start")
+        self.event_dispatcher.subscribe(self._handle_session_event, "session_end")
 
         # Connect tray icon signals
         self.activated.connect(self._handle_tray_activation)
@@ -177,15 +180,13 @@ class SystemTrayApp(QSystemTrayIcon):
                 "Session Started",
                 "Work session has been started",
                 QSystemTrayIcon.MessageIcon.Information,
-                2000
+                2000,
             )
 
         except Exception as e:
             logger.error(f"Error starting session: {e}")
             QMessageBox.critical(
-                None,
-                "Error",
-                "Failed to start session. Please try again."
+                None, "Error", "Failed to start session. Please try again."
             )
 
     @pyqtSlot()
@@ -204,15 +205,13 @@ class SystemTrayApp(QSystemTrayIcon):
                 "Session Ended",
                 "Work session has been ended",
                 QSystemTrayIcon.MessageIcon.Information,
-                2000
+                2000,
             )
 
         except Exception as e:
             logger.error(f"Error ending session: {e}")
             QMessageBox.critical(
-                None,
-                "Error",
-                "Failed to end session. Please try again."
+                None, "Error", "Failed to end session. Please try again."
             )
 
     @pyqtSlot()
@@ -223,7 +222,7 @@ class SystemTrayApp(QSystemTrayIcon):
                 self.dashboard = Dashboard(
                     self.analytics_service,
                     self.suggestion_service,
-                    self.session_service
+                    self.session_service,
                 )
 
             self.dashboard.show()
@@ -232,9 +231,7 @@ class SystemTrayApp(QSystemTrayIcon):
         except Exception as e:
             logger.error(f"Error showing dashboard: {e}")
             QMessageBox.critical(
-                None,
-                "Error",
-                "Failed to open dashboard. Please try again."
+                None, "Error", "Failed to open dashboard. Please try again."
             )
 
     @pyqtSlot()
@@ -250,9 +247,7 @@ class SystemTrayApp(QSystemTrayIcon):
         except Exception as e:
             logger.error(f"Error showing settings: {e}")
             QMessageBox.critical(
-                None,
-                "Error",
-                "Failed to open settings. Please try again."
+                None, "Error", "Failed to open settings. Please try again."
             )
 
     @pyqtSlot()
@@ -269,22 +264,29 @@ class SystemTrayApp(QSystemTrayIcon):
             if self.settings_dialog:
                 self.settings_dialog.close()
 
+            # Stop monitoring
+            self.activity_monitor.stop_monitoring()
+
+            # Dispatch final status
+            self.event_dispatcher.dispatch(
+                SystemStatusEvent(
+                    status="application_shutdown",
+                    timestamp=datetime.now(),
+                    details={"reason": "user_request"},
+                )
+            )
+
             # Quit application
             QApplication.quit()
 
         except Exception as e:
-            logger.error(f"Error quitting application: {e}")
+            logger.error(f"Error quitting application: {e}", exc_info=True)
             QMessageBox.critical(
-                None,
-                "Error",
-                "Failed to quit properly. Force closing."
+                None, "Error", "Failed to quit properly. Force closing."
             )
             sys.exit(1)
 
-    def _handle_productivity_alert(
-        self,
-        event: ProductivityAlertEvent
-    ) -> None:
+    def _handle_productivity_alert(self, event: ProductivityAlertEvent) -> None:
         """Handle productivity alert events.
 
         Args:
@@ -294,15 +296,14 @@ class SystemTrayApp(QSystemTrayIcon):
             # Show notification with suggestions
             message = (
                 f"Productivity Score: {event.productivity_score:.2f}\n"
-                "Suggestions:\n" +
-                "\n".join(f"- {s}" for s in event.suggestions[:3])
+                "Suggestions:\n" + "\n".join(f"- {s}" for s in event.suggestions[:3])
             )
 
             self.showMessage(
                 "Productivity Alert",
                 message,
                 QSystemTrayIcon.MessageIcon.Information,
-                5000
+                5000,
             )
 
         except Exception as e:
@@ -329,10 +330,7 @@ class SystemTrayApp(QSystemTrayIcon):
         except Exception as e:
             logger.error(f"Error handling session event: {e}")
 
-    def _handle_tray_activation(
-        self,
-        reason: QSystemTrayIcon.ActivationReason
-    ) -> None:
+    def _handle_tray_activation(self, reason: QSystemTrayIcon.ActivationReason) -> None:
         """Handle tray icon activation.
 
         Args:
@@ -342,22 +340,19 @@ class SystemTrayApp(QSystemTrayIcon):
             if reason == QSystemTrayIcon.ActivationReason.Trigger:
                 # Single click - show current status
                 if self.current_session_id:
-                    suggestions, score = (
-                        self.suggestion_service.get_current_suggestions()
-                    )
+                    (
+                        suggestions,
+                        score,
+                    ) = self.suggestion_service.get_current_suggestions()
                     message = (
                         f"Current Productivity: {score:.2f}\n"
-                        "Suggestions:\n" +
-                        "\n".join(f"- {s}" for s in suggestions[:3])
+                        "Suggestions:\n" + "\n".join(f"- {s}" for s in suggestions[:3])
                     )
                 else:
                     message = "No active session"
 
                 self.showMessage(
-                    "Status",
-                    message,
-                    QSystemTrayIcon.MessageIcon.Information,
-                    3000
+                    "Status", message, QSystemTrayIcon.MessageIcon.Information, 3000
                 )
 
             elif reason == QSystemTrayIcon.ActivationReason.DoubleClick:
@@ -376,16 +371,13 @@ class SystemTrayApp(QSystemTrayIcon):
     def _check_session_timeout(self) -> None:
         """Check for session timeout."""
         try:
-            if (
-                self.current_session_id and
-                self.session_service.check_session_timeout()
-            ):
+            if self.current_session_id and self.session_service.check_session_timeout():
                 # Show warning
                 self.showMessage(
                     "Session Timeout",
                     "Session has been inactive for too long",
                     QSystemTrayIcon.MessageIcon.Warning,
-                    5000
+                    5000,
                 )
 
         except Exception as e:
@@ -407,15 +399,17 @@ class SystemTrayApp(QSystemTrayIcon):
 
 
 def run_system_tray(
+    activity_monitor: ActivityMonitor,
     session_service: SessionService,
     analytics_service: AnalyticsService,
     suggestion_service: TaskSuggestionService,
     event_dispatcher: EventDispatcher,
-    icon_path: Optional[str] = None
+    icon_path: Optional[str] = None,
 ) -> None:
     """Run the system tray application.
 
     Args:
+        activity_monitor: Activity monitoring service
         session_service: Service for managing work sessions
         analytics_service: Service for analytics
         suggestion_service: Service for task suggestions
@@ -429,12 +423,13 @@ def run_system_tray(
 
         # Create system tray
         tray = SystemTrayApp(
-            session_service,
-            analytics_service,
-            suggestion_service,
-            event_dispatcher,
-            icon_path,
-            parent=app
+            activity_monitor=activity_monitor,
+            session_service=session_service,
+            analytics_service=analytics_service,
+            suggestion_service=suggestion_service,
+            event_dispatcher=event_dispatcher,
+            icon_path=icon_path,
+            parent=app,
         )
 
         # Run application

@@ -34,13 +34,9 @@ def mock_categorizer():
         "category_distribution": {
             "Development": {"productivity_score": 0.8, "occurrence_count": 2},
             "Communication": {"productivity_score": 0.7, "occurrence_count": 1},
-            "Research": {"productivity_score": 0.6, "occurrence_count": 1}
+            "Research": {"productivity_score": 0.6, "occurrence_count": 1},
         },
-        "time_productivity": {
-            "morning": 0.8,
-            "afternoon": 0.6,
-            "evening": 0.7
-        }
+        "time_productivity": {"morning": 0.8, "afternoon": 0.6, "evening": 0.7},
     }
     return categorizer
 
@@ -55,17 +51,14 @@ def mock_learner():
 
 @pytest.fixture
 def suggestion_service(
-    mock_repository,
-    mock_dispatcher,
-    mock_categorizer,
-    mock_learner
+    mock_repository, mock_dispatcher, mock_categorizer, mock_learner
 ):
     """Create task suggestion service."""
     return TaskSuggestionService(
         repository=mock_repository,
         event_dispatcher=mock_dispatcher,
         categorizer=mock_categorizer,
-        learner=mock_learner
+        learner=mock_learner,
     )
 
 
@@ -77,7 +70,7 @@ def sample_activities():
 
     # Create activities over last 4 hours
     for i in range(4):
-        start_time = current_time - timedelta(hours=4-i)
+        start_time = current_time - timedelta(hours=4 - i)
         end_time = start_time + timedelta(minutes=50)
 
         activity = Activity(
@@ -86,7 +79,7 @@ def sample_activities():
             process_id=1000 + i,
             executable_path=f"/path/to/test_{i}",
             start_time=start_time,
-            end_time=end_time
+            end_time=end_time,
         )
         activities.append(activity)
 
@@ -104,30 +97,22 @@ def test_initialization(suggestion_service, mock_dispatcher):
 def test_time_based_suggestions(suggestion_service):
     """Test time-based suggestions."""
     # Test morning suggestions
-    with patch('datetime.datetime') as mock_dt:
+    with patch("datetime.datetime") as mock_dt:
         mock_dt.now.return_value = datetime(2024, 1, 1, 10, 0)  # 10 AM
-        suggestions = suggestion_service._get_time_based_suggestions(
-            mock_dt.now(),
-            []
-        )
+        suggestions = suggestion_service._get_time_based_suggestions(mock_dt.now(), [])
         assert len(suggestions) == 3
         assert "Review your goals for the day" in suggestions
 
     # Test afternoon suggestions
-    with patch('datetime.datetime') as mock_dt:
+    with patch("datetime.datetime") as mock_dt:
         mock_dt.now.return_value = datetime(2024, 1, 1, 15, 0)  # 3 PM
-        suggestions = suggestion_service._get_time_based_suggestions(
-            mock_dt.now(),
-            []
-        )
+        suggestions = suggestion_service._get_time_based_suggestions(mock_dt.now(), [])
         assert len(suggestions) == 3
         assert "Focus on completing ongoing tasks" in suggestions
 
 
 def test_productivity_based_suggestions(
-    suggestion_service,
-    mock_categorizer,
-    sample_activities
+    suggestion_service, mock_categorizer, sample_activities
 ):
     """Test productivity-based suggestions."""
     # Mock low productivity scenario
@@ -135,13 +120,12 @@ def test_productivity_based_suggestions(
         "overall_productivity": 0.5,
         "category_distribution": {
             "Social Media": {"productivity_score": 0.3, "occurrence_count": 5},
-            "Development": {"productivity_score": 0.8, "occurrence_count": 3}
-        }
+            "Development": {"productivity_score": 0.8, "occurrence_count": 3},
+        },
     }
 
     suggestions = suggestion_service._get_productivity_based_suggestions(
-        0.5,  # Below threshold
-        sample_activities
+        0.5, sample_activities  # Below threshold
     )
 
     assert len(suggestions) > 0
@@ -150,10 +134,7 @@ def test_productivity_based_suggestions(
 
 
 def test_pattern_based_suggestions(
-    suggestion_service,
-    mock_learner,
-    mock_categorizer,
-    sample_activities
+    suggestion_service, mock_learner, mock_categorizer, sample_activities
 ):
     """Test pattern-based suggestions."""
     # Mock learner prediction
@@ -165,22 +146,13 @@ def test_pattern_based_suggestions(
         "category_distribution": {
             "Development": {"productivity_score": 0.8, "occurrence_count": 4},
             "Communication": {"productivity_score": 0.7, "occurrence_count": 4},
-            "Research": {"productivity_score": 0.6, "occurrence_count": 4}
+            "Research": {"productivity_score": 0.6, "occurrence_count": 4},
         },
-        "time_productivity": {
-            "morning": 0.8,
-            "afternoon": 0.6,
-            "evening": 0.7
-        },
-        "context_switches": {
-            "frequency": "high",
-            "impact": -0.2
-        }
+        "time_productivity": {"morning": 0.8, "afternoon": 0.6, "evening": 0.7},
+        "context_switches": {"frequency": "high", "impact": -0.2},
     }
 
-    suggestions = suggestion_service._get_pattern_based_suggestions(
-        sample_activities
-    )
+    suggestions = suggestion_service._get_pattern_based_suggestions(sample_activities)
 
     assert len(suggestions) > 0
     assert any("Development IDE" in s for s in suggestions)
@@ -206,7 +178,7 @@ def test_handle_activity_end(
     mock_repository,
     mock_dispatcher,
     mock_categorizer,
-    sample_activities
+    sample_activities,
 ):
     """Test activity end event handling."""
     # Mock repository response
@@ -214,9 +186,7 @@ def test_handle_activity_end(
 
     # Create activity end event
     event = ActivityEndEvent(
-        activity=sample_activities[-1],
-        duration=3600,
-        timestamp=datetime.now()
+        activity=sample_activities[-1], duration=3600, timestamp=datetime.now()
     )
 
     # Handle event
@@ -231,10 +201,7 @@ def test_handle_activity_end(
 
 
 def test_get_current_suggestions(
-    suggestion_service,
-    mock_repository,
-    mock_categorizer,
-    sample_activities
+    suggestion_service, mock_repository, mock_categorizer, sample_activities
 ):
     """Test getting current suggestions."""
     # Mock repository response
@@ -248,11 +215,7 @@ def test_get_current_suggestions(
     assert score == 0.75
 
 
-def test_error_handling(
-    suggestion_service,
-    mock_repository,
-    mock_dispatcher
-):
+def test_error_handling(suggestion_service, mock_repository, mock_dispatcher):
     """Test error handling in suggestion generation."""
     # Mock repository to raise exception
     mock_repository.get_by_timerange.side_effect = Exception("Test error")
@@ -266,10 +229,7 @@ def test_error_handling(
 
 
 def test_suggestion_interval(
-    suggestion_service,
-    mock_repository,
-    mock_dispatcher,
-    sample_activities
+    suggestion_service, mock_repository, mock_dispatcher, sample_activities
 ):
     """Test suggestion interval handling."""
     # Mock repository response
@@ -277,9 +237,7 @@ def test_suggestion_interval(
 
     # Create activity end event
     event = ActivityEndEvent(
-        activity=sample_activities[-1],
-        duration=3600,
-        timestamp=datetime.now()
+        activity=sample_activities[-1], duration=3600, timestamp=datetime.now()
     )
 
     # First call should generate suggestions

@@ -1,0 +1,132 @@
+# Python
+.venv/
+__pycache__/
+
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+*.egg
+*.egg-info/
+
+# Distribution / packaging
+dist/
+build/
+eggs/
+bin/
+lib/
+lib64/
+parts/
+sdist/
+wheels/
+develop-eggs/
+.installed.cfg
+# PyInstaller
+#  PyInstaller creates a build/ and a dist/ directory.
+#  It also creates a .spec file.
+*.spec
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+# Translations
+*.mo
+*.pot
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+media/
+# Flask stuff:
+instance/
+# Scrapy stuff:
+.scrapy
+# Pyre type checker
+.pyre/
+# mypy
+.mypy_cache/
+# Pytype
+.pytype/
+# Cython debug symbols
+cython_debug/
+# Jupyter Notebook
+.ipynb_checkpoints/
+# VS Code
+.vscode/
+# PyCharm
+.idea/
+# Virtual environment
+venv/
+# Local configuration files
+*.local
+# Environment variables
+.env
+# Logs
+logs/
+# Temporary files
+*.tmp
+# Backup files
+*.bak
+# System files
+.DS_Store
+# macOS specific
+.AppleDouble
+.LSOverride
+# Thumbnails
+._*
+# Windows specific
+Thumbs.db
+# Linux specific
+*~
+# Editor specific
+*.swp
+*.swo
+# Backup files
+*.orig
+# Coverage reports
+coverage/
+# Pytest cache
+.pytest_cache/
+# SQLAlchemy migrations
+migrations/
+
+# SQLAlchemy Alembic migrations
+alembic/
+# SQLAlchemy database files
+*.sqlite
+*.db
+# Docker
+docker-compose.override.yml
+# Docker files
+Dockerfile
+# Docker images
+docker-compose.yml
+# Kubernetes
+k8s/
+# Helm charts
+helm/
+# Terraform
+terraform/
+# Ansible
+ansible/
+# CloudFormation
+cloudformation/
+# Serverless Framework
+serverless.yml
+# AWS SAM
+samconfig.toml
+# Google Cloud
+.gcloud/
+
+
+#Project level files
+src/ai_work_assistant.egg-info/
+*__pycache__*
+data/

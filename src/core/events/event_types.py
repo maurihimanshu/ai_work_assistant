@@ -1,14 +1,28 @@
 """Event type definitions."""
 
+import os
+import sys
 from dataclasses import dataclass, fields
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional, Type, TypeVar, Union
 
-from ..entities.activity import Activity
+# Add the parent directory to Python path to make the src package importable
+parent_dir = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+from core.entities.activity import Activity
+
+T = TypeVar("T")
 
 
 class EventValidationMixin:
     """Mixin class for event validation."""
+
+    timestamp: datetime
+    event_type: str
 
     def validate(self) -> None:
         """Validate event data.
@@ -17,7 +31,7 @@ class EventValidationMixin:
             ValueError: If validation fails
         """
         # Check required fields
-        for field in fields(self):
+        for field in fields(self):  # type: ignore
             value = getattr(self, field.name)
             if not field.default and not field.default_factory and value is None:
                 raise ValueError(f"Required field '{field.name}' is None")
@@ -44,6 +58,7 @@ class EventValidationMixin:
 @dataclass
 class ActivityStartEvent(EventValidationMixin):
     """Event emitted when an activity starts."""
+
     activity: Activity
     timestamp: datetime
     event_type: str = "activity_start"
@@ -57,6 +72,7 @@ class ActivityStartEvent(EventValidationMixin):
 @dataclass
 class ActivityEndEvent(EventValidationMixin):
     """Event emitted when an activity ends."""
+
     activity: Activity
     duration: float  # Duration in seconds
     timestamp: datetime
@@ -73,6 +89,7 @@ class ActivityEndEvent(EventValidationMixin):
 @dataclass
 class IdleStartEvent(EventValidationMixin):
     """Event emitted when the system becomes idle."""
+
     last_activity: Optional[Activity]
     timestamp: datetime
     event_type: str = "idle_start"
@@ -81,6 +98,7 @@ class IdleStartEvent(EventValidationMixin):
 @dataclass
 class IdleEndEvent(EventValidationMixin):
     """Event emitted when the system becomes active after being idle."""
+
     idle_duration: float  # Duration in seconds
     timestamp: datetime
     event_type: str = "idle_end"
@@ -94,6 +112,7 @@ class IdleEndEvent(EventValidationMixin):
 @dataclass
 class ProductivityAlertEvent(EventValidationMixin):
     """Event emitted for productivity alerts."""
+
     productivity_score: float
     time_window: str  # e.g., "last_hour", "last_4_hours", "today"
     suggestions: List[str]
@@ -113,6 +132,7 @@ class ProductivityAlertEvent(EventValidationMixin):
 @dataclass
 class BehaviorPatternEvent(EventValidationMixin):
     """Event emitted when significant behavior patterns are detected."""
+
     pattern_type: str  # e.g., "consistent_start_time", "productivity_trend"
     pattern_data: Dict  # Pattern-specific details
     significance: float  # Pattern significance score (0-1)
@@ -130,6 +150,7 @@ class BehaviorPatternEvent(EventValidationMixin):
 @dataclass
 class SessionEvent(EventValidationMixin):
     """Event emitted for session-related activities."""
+
     session_id: str
     timestamp: datetime
     event_type: str  # "session_start", "session_end", "session_restore"
@@ -147,6 +168,7 @@ class SessionEvent(EventValidationMixin):
 @dataclass
 class SystemStatusEvent(EventValidationMixin):
     """Event emitted for system status updates."""
+
     status: str
     timestamp: datetime
     event_type: str = "system_status"
@@ -163,6 +185,7 @@ class SystemStatusEvent(EventValidationMixin):
 @dataclass
 class ErrorEvent(EventValidationMixin):
     """Event emitted when system errors occur."""
+
     error_type: str
     error_message: str
     timestamp: datetime
@@ -182,6 +205,7 @@ class ErrorEvent(EventValidationMixin):
 @dataclass
 class ConfigurationChangeEvent(EventValidationMixin):
     """Event emitted when system configuration changes."""
+
     setting_key: str
     old_value: Any
     new_value: Any

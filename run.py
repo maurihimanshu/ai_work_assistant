@@ -10,6 +10,7 @@ import os
 import sys
 from pathlib import Path
 
+
 def setup_environment():
     """Set up the Python path to include the src directory."""
     # Add src directory to Python path
@@ -19,8 +20,10 @@ def setup_environment():
     # Set current working directory to project root
     os.chdir(Path(__file__).parent)
 
+
 if __name__ == "__main__":
     setup_environment()
 
     from main import main
+
     main()

@@ -30,7 +30,7 @@ def mock_platform_monitor():
         "test_app.exe",
         "Test Window",
         12345,
-        r"C:\test\test_app.exe"
+        r"C:\test\test_app.exe",
     )
     monitor.get_idle_time.return_value = 0
     return monitor
@@ -39,13 +39,15 @@ def mock_platform_monitor():
 @pytest.fixture
 def monitor(mock_repository, event_dispatcher, mock_platform_monitor):
     """Create an ActivityMonitor instance with mocks."""
-    with patch("src.core.services.activity_monitor.create_platform_monitor") as mock_create:
+    with patch(
+        "src.core.services.activity_monitor.create_platform_monitor"
+    ) as mock_create:
         mock_create.return_value = mock_platform_monitor
         return ActivityMonitor(
             repository=mock_repository,
             event_dispatcher=event_dispatcher,
             idle_threshold=300,
-            update_interval=1
+            update_interval=1,
         )
 
 
@@ -94,7 +96,7 @@ def test_update_activity_new_window(monitor, mock_repository, mock_platform_moni
         "another_app.exe",
         "Another Window",
         67890,
-        r"C:\test\another_app.exe"
+        r"C:\test\another_app.exe",
     )
 
     # Second update - should save current and create new
@@ -110,15 +112,15 @@ def test_cleanup_old_data(monitor, mock_repository):
 
     cutoff_date = datetime.now() - timedelta(days=30)
     mock_repository.cleanup_old_activities.assert_called_once()
-    assert mock_repository.cleanup_old_activities.call_args[0][0].date() == cutoff_date.date()
+    assert (
+        mock_repository.cleanup_old_activities.call_args[0][0].date()
+        == cutoff_date.date()
+    )
 
 
 @patch("src.core.services.activity_monitor.time.sleep", side_effect=KeyboardInterrupt)
 def test_start_monitoring_graceful_shutdown(
-    mock_sleep,
-    monitor,
-    mock_repository,
-    mock_platform_monitor
+    mock_sleep, monitor, mock_repository, mock_platform_monitor
 ):
     """Test graceful shutdown of monitoring."""
     # Start monitoring (will raise KeyboardInterrupt due to mock)

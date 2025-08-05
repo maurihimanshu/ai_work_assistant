@@ -39,7 +39,7 @@ def prediction_service(mock_repository, mock_learner, mock_categorizer):
         learner=mock_learner,
         categorizer=mock_categorizer,
         prediction_window=timedelta(hours=1),
-        load_initial_data=False  # Don't load data during initialization
+        load_initial_data=False,  # Don't load data during initialization
     )
 
 
@@ -55,17 +55,14 @@ def sample_activities():
             executable_path="/path/to/test",
             start_time=current_time - timedelta(minutes=30),
             active_time=240.0,
-            idle_time=60.0
+            idle_time=60.0,
         )
         for i in range(10)
     ]
 
 
 def test_initialization_with_data_loading(
-    mock_repository,
-    mock_learner,
-    mock_categorizer,
-    sample_activities
+    mock_repository, mock_learner, mock_categorizer, sample_activities
 ):
     """Test service initialization with data loading."""
     mock_repository.get_by_timerange.return_value = sample_activities
@@ -74,7 +71,7 @@ def test_initialization_with_data_loading(
         repository=mock_repository,
         learner=mock_learner,
         categorizer=mock_categorizer,
-        load_initial_data=True
+        load_initial_data=True,
     )
 
     assert mock_repository.get_by_timerange.call_count == 1
@@ -105,10 +102,7 @@ def test_get_prediction_data(prediction_service, mock_repository, sample_activit
 
 
 def test_predict_next_activity(
-    prediction_service,
-    mock_repository,
-    mock_learner,
-    sample_activities
+    prediction_service, mock_repository, mock_learner, sample_activities
 ):
     """Test activity prediction."""
     mock_repository.get_by_timerange.return_value = sample_activities
@@ -127,9 +121,7 @@ def test_predict_next_activity(
 
 
 def test_predict_next_activity_insufficient_data(
-    prediction_service,
-    mock_repository,
-    mock_learner
+    prediction_service, mock_repository, mock_learner
 ):
     """Test prediction with insufficient data."""
     mock_repository.get_by_timerange.return_value = []
@@ -141,10 +133,7 @@ def test_predict_next_activity_insufficient_data(
 
 
 def test_predict_next_activity_error(
-    prediction_service,
-    mock_repository,
-    mock_learner,
-    sample_activities
+    prediction_service, mock_repository, mock_learner, sample_activities
 ):
     """Test prediction error handling."""
     mock_repository.get_by_timerange.return_value = sample_activities
@@ -160,46 +149,41 @@ def test_get_activity_insights_custom_window(
     mock_repository,
     mock_categorizer,
     mock_learner,
-    sample_activities
+    sample_activities,
 ):
     """Test getting insights with custom time window."""
     mock_repository.get_by_timerange.return_value = sample_activities
     mock_categorizer.get_activity_insights.return_value = {
-        'overall_productivity': 0.8,
-        'time_productivity': {
-            'morning': 0.9,
-            'afternoon': 0.7,
-            'evening': 0.6,
-            'night': 0.5
-        }
+        "overall_productivity": 0.8,
+        "time_productivity": {
+            "morning": 0.9,
+            "afternoon": 0.7,
+            "evening": 0.6,
+            "night": 0.5,
+        },
     }
-    mock_learner.predict_next.return_value = 'code.exe'
+    mock_learner.predict_next.return_value = "code.exe"
     mock_repository.get_by_timerange.reset_mock()  # Reset any previous calls
 
-    insights = prediction_service.get_activity_insights(
-        time_window=timedelta(days=1)
-    )
+    insights = prediction_service.get_activity_insights(time_window=timedelta(days=1))
 
-    assert insights['productivity']['overall'] == 0.8
-    assert insights['productivity']['by_time']['morning'] == 0.9
-    assert insights['predicted_next'] == 'code.exe'
+    assert insights["productivity"]["overall"] == 0.8
+    assert insights["productivity"]["by_time"]["morning"] == 0.9
+    assert insights["predicted_next"] == "code.exe"
     assert mock_repository.get_by_timerange.call_count == 1
     assert len(mock_repository.get_by_timerange.call_args_list) == 1
 
 
 def test_get_activity_insights_no_data(
-    prediction_service,
-    mock_repository,
-    mock_categorizer,
-    mock_learner
+    prediction_service, mock_repository, mock_categorizer, mock_learner
 ):
     """Test getting insights with no data."""
     mock_repository.get_by_timerange.return_value = []
 
     insights = prediction_service.get_activity_insights()
 
-    assert insights['productivity']['overall'] == 0.0
-    assert all(v == 0.0 for v in insights['productivity']['by_time'].values())
+    assert insights["productivity"]["overall"] == 0.0
+    assert all(v == 0.0 for v in insights["productivity"]["by_time"].values())
 
 
 def test_update_model(prediction_service, mock_learner, sample_activities):

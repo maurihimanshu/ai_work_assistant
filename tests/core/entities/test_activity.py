@@ -15,7 +15,7 @@ def test_activity_creation():
         window_title="Test Window",
         process_id=1234,
         executable_path="/path/to/test",
-        start_time=now
+        start_time=now,
     )
 
     assert activity.app_name == "test_app"
@@ -36,7 +36,7 @@ def test_activity_update_times_active():
         window_title="Test Window",
         process_id=1234,
         executable_path="/path/to/test",
-        start_time=now
+        start_time=now,
     )
 
     # Update time after 5 seconds of activity
@@ -56,7 +56,7 @@ def test_activity_update_times_idle():
         window_title="Test Window",
         process_id=1234,
         executable_path="/path/to/test",
-        start_time=now
+        start_time=now,
     )
 
     # Update time after 5 seconds of idle time
@@ -79,7 +79,7 @@ def test_activity_serialization():
         start_time=now,
         end_time=now + timedelta(seconds=10),
         active_time=8.0,
-        idle_time=2.0
+        idle_time=2.0,
     )
 
     # Convert to dict

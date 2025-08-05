@@ -1,9 +1,12 @@
 """Continuous learning system for adapting to user behavior."""
 
 import logging
+import os
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+import joblib
 import numpy as np
 from sklearn.base import BaseEstimator
 from sklearn.ensemble import RandomForestClassifier
@@ -15,236 +18,159 @@ logger = logging.getLogger(__name__)
 
 
 class ContinuousLearner:
-    """Manages continuous learning and model adaptation."""
+    """Continuous learning model for activity prediction."""
 
-    def __init__(
-        self,
-        base_model: Optional[BaseEstimator] = None,
-        window_size: int = 1000,  # Number of samples to keep in memory
-        adaptation_rate: float = 0.3,  # Weight for new data vs old model
-        min_samples_adapt: int = 50,  # Minimum samples before adaptation
-        performance_threshold: float = 0.7  # Minimum accuracy to accept adaptation
-    ):
-        """Initialize the continuous learner.
+    def __init__(self, model_dir: str = None, event_dispatcher=None):
+        """Initialize continuous learner.
 
         Args:
-            base_model: Initial model to start with (creates new if None)
-            window_size: Maximum number of samples to keep for adaptation
-            adaptation_rate: Weight given to new data (0-1)
-            min_samples_adapt: Minimum samples needed before adapting
-            performance_threshold: Minimum performance to accept adaptation
+            model_dir: Directory to save/load model
+            event_dispatcher: Event dispatcher instance
         """
-        self.window_size = window_size
-        self.adaptation_rate = adaptation_rate
-        self.min_samples_adapt = min_samples_adapt
-        self.performance_threshold = performance_threshold
-
+        self.model_dir = model_dir or "data/models"
+        self.event_dispatcher = event_dispatcher
         self.feature_extractor = ActivityFeatureExtractor()
-        self.current_model = base_model or RandomForestClassifier(
+        self.model = RandomForestClassifier(
             n_estimators=100,
-            warm_start=True  # Enable incremental learning
+            max_depth=10,
+            random_state=42
         )
+        self.is_fitted = False
+        self._load_model()
 
-        # Initialize sample windows
-        self.activity_window: List[Activity] = []
-        self.performance_history: List[float] = []
-        self.last_adaptation: Optional[datetime] = None
-
-    def _update_window(self, activity: Activity) -> None:
-        """Update the sliding window of activities.
-
-        Args:
-            activity: New activity to add
-        """
-        self.activity_window.append(activity)
-        if len(self.activity_window) > self.window_size:
-            self.activity_window.pop(0)
-
-    def _should_adapt(self) -> bool:
-        """Check if model should be adapted.
-
-        Returns:
-            bool: True if model should be adapted
-        """
-        if len(self.activity_window) < self.min_samples_adapt:
-            return False
-
-        if not self.last_adaptation:
-            return True
-
-        # Adapt if performance is degrading
-        if (len(self.performance_history) >= 2 and
-            self.performance_history[-1] < self.performance_history[-2]):
-            return True
-
-        return False
-
-    def _prepare_adaptation_data(
-        self
-    ) -> Tuple[np.ndarray, np.ndarray, List[str]]:
-        """Prepare data for model adaptation.
-
-        Returns:
-            tuple: (features, labels, unique_apps)
-        """
-        # Extract features from window
-        features_df = self.feature_extractor.extract_features(
-            self.activity_window
-        )
-
-        # Prepare target variable (next app prediction)
-        app_names = [a.app_name for a in self.activity_window]
-        unique_apps = list(set(app_names))
-
-        # Convert to numeric labels
-        label_map = {app: i for i, app in enumerate(unique_apps)}
-        labels = np.array([label_map[app] for app in app_names])
-
-        return features_df.values, labels, unique_apps
-
-    def _evaluate_adaptation(
-        self,
-        X: np.ndarray,
-        y: np.ndarray,
-        adapted_model: BaseEstimator
-    ) -> float:
-        """Evaluate adapted model performance.
-
-        Args:
-            X: Feature matrix
-            y: True labels
-            adapted_model: Model to evaluate
-
-        Returns:
-            float: Accuracy score
-        """
-        # Use last 20% of data for evaluation
-        split_idx = int(len(X) * 0.8)
-        X_eval = X[split_idx:]
-        y_eval = y[split_idx:]
-
-        predictions = adapted_model.predict(X_eval)
-        accuracy = np.mean(predictions == y_eval)
-
-        return float(accuracy)
-
-    def adapt_model(self) -> Tuple[bool, Optional[float]]:
-        """Adapt model to recent activities.
-
-        Returns:
-            tuple: (was_adapted, new_accuracy if adapted else None)
-        """
-        if not self._should_adapt():
-            return False, None
-
+    def _load_model(self) -> None:
+        """Load model from disk if available."""
         try:
-            # Prepare adaptation data
-            X, y, unique_apps = self._prepare_adaptation_data()
+            if not os.path.exists(self.model_dir):
+                os.makedirs(self.model_dir)
 
-            # Create temporary model for adaptation
-            adapted_model = RandomForestClassifier(
-                n_estimators=max(
-                    int(100 * self.adaptation_rate),
-                    10
-                ),
-                warm_start=True
-            )
-
-            # Train on new data
-            adapted_model.fit(X, y)
-
-            # Evaluate adaptation
-            accuracy = self._evaluate_adaptation(X, y, adapted_model)
-
-            if accuracy >= self.performance_threshold:
-                # Update current model
-                if hasattr(self.current_model, 'estimators_'):
-                    # For random forest, merge trees
-                    old_trees = int(
-                        len(self.current_model.estimators_) * 
-                        (1 - self.adaptation_rate)
-                    )
-                    new_trees = len(adapted_model.estimators_)
-
-                    self.current_model.estimators_ = (
-                        self.current_model.estimators_[-old_trees:] +
-                        adapted_model.estimators_
-                    )
-                else:
-                    # For other models, replace with adapted model
-                    self.current_model = adapted_model
-
-                self.last_adaptation = datetime.now()
-                self.performance_history.append(accuracy)
-
-                logger.info(
-                    f"Model adapted successfully. New accuracy: {accuracy:.3f}"
-                )
-                return True, accuracy
+            model_path = os.path.join(self.model_dir, "activity_model.joblib")
+            if os.path.exists(model_path):
+                self.model = joblib.load(model_path)
+                self.is_fitted = True
+                logger.info("Loaded existing model")
             else:
-                logger.warning(
-                    f"Adaptation rejected. Accuracy {accuracy:.3f} below "
-                    f"threshold {self.performance_threshold}"
-                )
-                return False, accuracy
+                logger.info("No existing model found")
 
         except Exception as e:
-            logger.error(f"Error during model adaptation: {e}")
-            return False, None
+            logger.error(f"Error loading model: {e}", exc_info=True)
 
-    def update(self, activity: Activity) -> None:
-        """Update learner with new activity.
+    def _save_model(self) -> None:
+        """Save model to disk."""
+        try:
+            if not os.path.exists(self.model_dir):
+                os.makedirs(self.model_dir)
+
+            model_path = os.path.join(self.model_dir, "activity_model.joblib")
+            joblib.dump(self.model, model_path)
+            logger.info("Saved model to disk")
+
+        except Exception as e:
+            logger.error(f"Error saving model: {e}", exc_info=True)
+
+    def fit(self, activities: List[Dict]) -> None:
+        """Train model on activities.
 
         Args:
-            activity: New activity to learn from
-        """
-        self._update_window(activity)
-        self.adapt_model()
-
-    def predict_next(self, recent_activities: List[Activity]) -> Optional[str]:
-        """Predict next activity.
-
-        Args:
-            recent_activities: Recent activities to base prediction on
-
-        Returns:
-            str: Predicted next activity name or None if prediction not possible
+            activities: List of activity dictionaries
         """
         try:
-            # Extract features
-            features_df = self.feature_extractor.extract_features(
-                recent_activities
-            )
-            if features_df.empty:
-                return None
+            if not activities:
+                logger.warning("No activities provided for training")
+                return
 
-            # Make prediction
-            X = features_df.iloc[-1:].values
-            prediction = self.current_model.predict(X)[0]
+            # Extract features and labels
+            X = self.feature_extractor.extract_features(activities)
+            y = self.feature_extractor.extract_labels(activities)
 
-            # Convert numeric prediction back to app name
-            app_names = [a.app_name for a in self.activity_window]
-            unique_apps = list(set(app_names))
+            if len(X) == 0 or len(y) == 0:
+                logger.warning("No valid features/labels extracted")
+                return
 
-            return unique_apps[prediction]
+            # Train model
+            self.model.fit(X, y)
+            self.is_fitted = True
+            logger.info(f"Model trained on {len(X)} samples")
+
+            # Save model
+            self._save_model()
 
         except Exception as e:
-            logger.error(f"Error making prediction: {e}")
-            return None
+            logger.error(f"Error training model: {e}", exc_info=True)
 
-    def get_performance_stats(self) -> Dict[str, float]:
-        """Get performance statistics.
+    def predict_next(self, recent_activities: List[Dict]) -> List[Dict]:
+        """Predict next likely activities.
+
+        Args:
+            recent_activities: List of recent activities
 
         Returns:
-            dict: Performance statistics
+            list: Predicted activities with confidence scores
         """
-        if not self.performance_history:
-            return {}
+        try:
+            if not self.is_fitted:
+                logger.warning("Model not trained yet")
+                return []
 
-        return {
-            'current_accuracy': self.performance_history[-1],
-            'average_accuracy': np.mean(self.performance_history),
-            'min_accuracy': min(self.performance_history),
-            'max_accuracy': max(self.performance_history),
-            'adaptation_count': len(self.performance_history)
-        }
+            if not recent_activities:
+                logger.warning("No recent activities provided")
+                return []
+
+            # Extract features
+            X = self.feature_extractor.extract_features(recent_activities)
+            if len(X) == 0:
+                logger.warning("No valid features extracted")
+                return []
+
+            # Get predictions and probabilities
+            predictions = self.model.predict(X)
+            probabilities = self.model.predict_proba(X)
+
+            # Format predictions
+            results = []
+            for pred, probs in zip(predictions, probabilities):
+                confidence = max(probs)
+                if confidence > 0.3:  # Only include predictions with reasonable confidence
+                    results.append({
+                        "type": pred,
+                        "confidence": confidence
+                    })
+
+            return sorted(results, key=lambda x: x["confidence"], reverse=True)[:5]  # Return top 5
+
+        except Exception as e:
+            logger.error(f"Error making prediction: {e}", exc_info=True)
+            return []
+
+    def update(self, new_activities: List[Dict]) -> None:
+        """Update model with new activities.
+
+        Args:
+            new_activities: List of new activities
+        """
+        try:
+            if not new_activities:
+                return
+
+            # If model not trained yet, do initial training
+            if not self.is_fitted:
+                self.fit(new_activities)
+                return
+
+            # Extract features and labels
+            X_new = self.feature_extractor.extract_features(new_activities)
+            y_new = self.feature_extractor.extract_labels(new_activities)
+
+            if len(X_new) == 0 or len(y_new) == 0:
+                return
+
+            # Partial fit not available for RandomForest, so we retrain
+            # In a production system, we might want to use a different model
+            # that supports partial_fit, or maintain a buffer of recent data
+            self.model.fit(X_new, y_new)
+            self._save_model()
+
+            logger.info(f"Model updated with {len(X_new)} new samples")
+
+        except Exception as e:
+            logger.error(f"Error updating model: {e}", exc_info=True)

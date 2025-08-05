@@ -28,13 +28,7 @@ logger = logging.getLogger(__name__)
 class LoadTestWorker(QThread):
     """Worker thread for load testing."""
 
-    def __init__(
-        self,
-        repository,
-        event_dispatcher,
-        duration: int = 60,
-        parent=None
-    ):
+    def __init__(self, repository, event_dispatcher, duration: int = 60, parent=None):
         """Initialize worker.
 
         Args:
@@ -66,19 +60,14 @@ class LoadTestWorker(QThread):
                     start_time=current_time,
                     end_time=current_time + timedelta(minutes=1),
                     active_time=random.randint(30, 60),
-                    idle_time=random.randint(0, 10)
+                    idle_time=random.randint(0, 10),
                 )
 
                 # Dispatch events
-                self.event_dispatcher.dispatch(
-                    ActivityStartEvent(activity=activity)
-                )
+                self.event_dispatcher.dispatch(ActivityStartEvent(activity=activity))
                 time.sleep(0.1)  # Simulate activity duration
                 self.event_dispatcher.dispatch(
-                    ActivityEndEvent(
-                        activity=activity,
-                        duration=60
-                    )
+                    ActivityEndEvent(activity=activity, duration=60)
                 )
 
             except Exception as e:
@@ -100,11 +89,7 @@ def load_test_app(qtbot):
     return app
 
 
-def test_concurrent_activity_monitoring(
-    load_test_app,
-    mock_repository,
-    qtbot
-):
+def test_concurrent_activity_monitoring(load_test_app, mock_repository, qtbot):
     """Test concurrent activity monitoring."""
     dispatcher = EventDispatcher()
     monitor = ActivityMonitor(mock_repository, dispatcher)
@@ -113,9 +98,7 @@ def test_concurrent_activity_monitoring(
     workers = []
     for _ in range(4):  # 4 concurrent workers
         worker = LoadTestWorker(
-            mock_repository,
-            dispatcher,
-            duration=10  # 10 seconds test
+            mock_repository, dispatcher, duration=10  # 10 seconds test
         )
         workers.append(worker)
 
@@ -134,17 +117,11 @@ def test_concurrent_activity_monitoring(
     logger.info(f"Processed {len(activities)} activities")
 
 
-def test_analytics_under_load(
-    load_test_app,
-    mock_repository,
-    qtbot
-):
+def test_analytics_under_load(load_test_app, mock_repository, qtbot):
     """Test analytics service under load."""
     dispatcher = EventDispatcher()
     analytics = AnalyticsService(
-        repository=mock_repository,
-        event_dispatcher=dispatcher,
-        categorizer=None
+        repository=mock_repository, event_dispatcher=dispatcher, categorizer=None
     )
 
     # Create update timer
@@ -153,9 +130,7 @@ def test_analytics_under_load(
     def update_analytics():
         """Update analytics and measure time."""
         start_time = time.time()
-        report = analytics.get_productivity_report(
-            time_window=timedelta(days=1)
-        )
+        report = analytics.get_productivity_report(time_window=timedelta(days=1))
         update_time = time.time() - start_time
         update_times.append(update_time)
 
@@ -164,11 +139,7 @@ def test_analytics_under_load(
     timer.start(1000)  # Update every second
 
     # Create activity generator
-    worker = LoadTestWorker(
-        mock_repository,
-        dispatcher,
-        duration=10  # 10 seconds test
-    )
+    worker = LoadTestWorker(mock_repository, dispatcher, duration=10)  # 10 seconds test
     worker.start()
 
     # Wait for completion
@@ -182,12 +153,7 @@ def test_analytics_under_load(
     assert avg_update_time < 0.5  # Should update in under 500ms
 
 
-def test_session_management_under_load(
-    load_test_app,
-    mock_repository,
-    tmp_path,
-    qtbot
-):
+def test_session_management_under_load(load_test_app, mock_repository, tmp_path, qtbot):
     """Test session management under load."""
     dispatcher = EventDispatcher()
     session_dir = tmp_path / "sessions"
@@ -196,7 +162,7 @@ def test_session_management_under_load(
     service = SessionService(
         repository=mock_repository,
         event_dispatcher=dispatcher,
-        session_dir=str(session_dir)
+        session_dir=str(session_dir),
     )
 
     # Track session operations
@@ -211,10 +177,7 @@ def test_session_management_under_load(
 
         # Update state
         for i in range(10):
-            service.update_session_state(
-                f"app_{i}",
-                {"state": f"state_{i}"}
-            )
+            service.update_session_state(f"app_{i}", {"state": f"state_{i}"})
 
         # End session
         service.end_session()
@@ -247,18 +210,14 @@ def test_session_management_under_load(
     assert avg_operation_time < 0.2  # Should complete in under 200ms
 
 
-def test_suggestion_service_under_load(
-    load_test_app,
-    mock_repository,
-    qtbot
-):
+def test_suggestion_service_under_load(load_test_app, mock_repository, qtbot):
     """Test suggestion service under load."""
     dispatcher = EventDispatcher()
     service = TaskSuggestionService(
         repository=mock_repository,
         event_dispatcher=dispatcher,
         categorizer=None,
-        learner=None
+        learner=None,
     )
 
     # Track suggestion times
@@ -280,11 +239,7 @@ def test_suggestion_service_under_load(
     timer.start(100)  # Get suggestions every 100ms
 
     # Create activity generator
-    worker = LoadTestWorker(
-        mock_repository,
-        dispatcher,
-        duration=10  # 10 seconds test
-    )
+    worker = LoadTestWorker(mock_repository, dispatcher, duration=10)  # 10 seconds test
     worker.start()
 
     # Wait for completion
@@ -298,31 +253,22 @@ def test_suggestion_service_under_load(
     assert avg_suggestion_time < 0.1  # Should complete in under 100ms
 
 
-def test_ui_responsiveness_under_load(
-    load_test_app,
-    mock_repository,
-    qtbot
-):
+def test_ui_responsiveness_under_load(load_test_app, mock_repository, qtbot):
     """Test UI responsiveness under load."""
     from src.presentation.ui.dashboard import Dashboard
 
     # Create services
     dispatcher = EventDispatcher()
     analytics = AnalyticsService(
-        repository=mock_repository,
-        event_dispatcher=dispatcher,
-        categorizer=None
+        repository=mock_repository, event_dispatcher=dispatcher, categorizer=None
     )
     suggestion = TaskSuggestionService(
         repository=mock_repository,
         event_dispatcher=dispatcher,
         categorizer=None,
-        learner=None
+        learner=None,
     )
-    session = SessionService(
-        repository=mock_repository,
-        event_dispatcher=dispatcher
-    )
+    session = SessionService(repository=mock_repository, event_dispatcher=dispatcher)
 
     # Create dashboard
     dashboard = Dashboard(analytics, suggestion, session)
@@ -344,11 +290,7 @@ def test_ui_responsiveness_under_load(
     timer.start(500)  # Update every 500ms
 
     # Create activity generator
-    worker = LoadTestWorker(
-        mock_repository,
-        dispatcher,
-        duration=10  # 10 seconds test
-    )
+    worker = LoadTestWorker(mock_repository, dispatcher, duration=10)  # 10 seconds test
     worker.start()
 
     # Wait for completion
@@ -369,20 +311,18 @@ def test_system_stability(load_test_app, mock_repository, tmp_path):
     # Create services
     dispatcher = EventDispatcher()
     analytics = AnalyticsService(
-        repository=mock_repository,
-        event_dispatcher=dispatcher,
-        categorizer=None
+        repository=mock_repository, event_dispatcher=dispatcher, categorizer=None
     )
     suggestion = TaskSuggestionService(
         repository=mock_repository,
         event_dispatcher=dispatcher,
         categorizer=None,
-        learner=None
+        learner=None,
     )
     session = SessionService(
         repository=mock_repository,
         event_dispatcher=dispatcher,
-        session_dir=str(tmp_path / "sessions")
+        session_dir=str(tmp_path / "sessions"),
     )
 
     # Track system metrics
@@ -405,9 +345,7 @@ def test_system_stability(load_test_app, mock_repository, tmp_path):
     workers = []
     for _ in range(4):  # 4 concurrent workers
         worker = LoadTestWorker(
-            mock_repository,
-            dispatcher,
-            duration=30  # 30 seconds test
+            mock_repository, dispatcher, duration=30  # 30 seconds test
         )
         workers.append(worker)
 

@@ -4,6 +4,7 @@ from datetime import datetime
 from threading import Thread
 from time import sleep
 from unittest.mock import MagicMock, patch
+
 import pytest
 
 from src.core.entities.activity import Activity
@@ -12,7 +13,7 @@ from src.core.events.event_dispatcher import (
     EventDispatcher,
     HandlerError,
     ProductivityEventHandler,
-    SystemEventHandler
+    SystemEventHandler,
 )
 from src.core.events.event_types import (
     ActivityEndEvent,
@@ -20,7 +21,7 @@ from src.core.events.event_types import (
     ConfigurationChangeEvent,
     ErrorEvent,
     ProductivityAlertEvent,
-    SystemStatusEvent
+    SystemStatusEvent,
 )
 
 
@@ -38,7 +39,7 @@ def sample_activity():
         window_title="Test Window",
         process_id=1234,
         executable_path="/path/to/test",
-        start_time=datetime.now()
+        start_time=datetime.now(),
     )
 
 
@@ -91,17 +92,13 @@ def test_event_unsubscription(dispatcher):
 def test_event_validation(dispatcher, current_time, sample_activity):
     """Test event validation."""
     # Test valid event
-    event = ActivityStartEvent(
-        activity=sample_activity,
-        timestamp=current_time
-    )
+    event = ActivityStartEvent(activity=sample_activity, timestamp=current_time)
     dispatcher.dispatch(event)  # Should not raise
 
     # Test invalid timestamp type
     with pytest.raises(ValueError) as exc_info:
         event = ActivityStartEvent(
-            activity=sample_activity,
-            timestamp="invalid"  # type: ignore
+            activity=sample_activity, timestamp="invalid"  # type: ignore
         )
         event.validate()  # Test validation directly
     assert "timestamp must be a datetime object" in str(exc_info.value)
@@ -111,7 +108,7 @@ def test_event_validation(dispatcher, current_time, sample_activity):
         event = ActivityEndEvent(
             activity=sample_activity,
             duration=-1,  # Invalid duration
-            timestamp=current_time
+            timestamp=current_time,
         )
         event.validate()  # Test validation directly
     assert "duration must be non-negative" in str(exc_info.value)
@@ -123,7 +120,7 @@ def test_event_validation(dispatcher, current_time, sample_activity):
             old_value="old",
             new_value="new",
             timestamp=current_time,
-            source=123  # type: ignore
+            source=123,  # type: ignore
         )
         event.validate()  # Test validation directly
     assert "source must be a string if provided" in str(exc_info.value)
@@ -142,10 +139,7 @@ def test_thread_safety(dispatcher, current_time):
     # Create and start multiple threads
     threads = []
     for i in range(10):
-        event = SystemStatusEvent(
-            status=f"test_{i}",
-            timestamp=current_time
-        )
+        event = SystemStatusEvent(status=f"test_{i}", timestamp=current_time)
         thread = Thread(target=dispatcher.dispatch, args=(event,))
         threads.append(thread)
         thread.start()
@@ -173,9 +167,7 @@ def test_error_recovery(dispatcher, current_time):
 
     # First attempt - should fail
     event = SystemStatusEvent(
-        status="test",
-        timestamp=current_time,
-        event_type="test_event"
+        status="test", timestamp=current_time, event_type="test_event"
     )
     dispatcher.dispatch(event)
 
@@ -195,15 +187,14 @@ def test_error_recovery(dispatcher, current_time):
 
 def test_handler_error_tracking(dispatcher, current_time):
     """Test handler error tracking and disabling."""
+
     def failing_handler(event):
         raise Exception("Test error")
 
     dispatcher.subscribe(failing_handler, "test_event")
 
     event = SystemStatusEvent(
-        status="test",
-        timestamp=current_time,
-        event_type="test_event"
+        status="test", timestamp=current_time, event_type="test_event"
     )
 
     # Fail three times
@@ -216,22 +207,18 @@ def test_handler_error_tracking(dispatcher, current_time):
     assert handler_status["test_event"][0]["error_count"] == 3
     assert handler_status["test_event"][0]["disabled"] is True
 
+
 def test_activity_event_handler(dispatcher, sample_activity, current_time):
     """Test activity event handler."""
     handler = ActivityEventHandler(dispatcher)
 
     # Test activity start
-    start_event = ActivityStartEvent(
-        activity=sample_activity,
-        timestamp=current_time
-    )
+    start_event = ActivityStartEvent(activity=sample_activity, timestamp=current_time)
     dispatcher.dispatch(start_event)
 
     # Test activity end
     end_event = ActivityEndEvent(
-        activity=sample_activity,
-        duration=60.0,
-        timestamp=current_time
+        activity=sample_activity, duration=60.0, timestamp=current_time
     )
     dispatcher.dispatch(end_event)
 
@@ -247,7 +234,7 @@ def test_productivity_event_handler(dispatcher, current_time):
         productivity_score=0.75,
         time_window="last_hour",
         suggestions=["Take a break", "Switch tasks"],
-        timestamp=current_time
+        timestamp=current_time,
     )
     dispatcher.dispatch(event)
 
@@ -260,9 +247,7 @@ def test_system_event_handler(dispatcher, current_time):
 
     # Test status event
     status_event = SystemStatusEvent(
-        status="running",
-        timestamp=current_time,
-        details={"uptime": 3600}
+        status="running", timestamp=current_time, details={"uptime": 3600}
     )
     dispatcher.dispatch(status_event)
 
@@ -271,7 +256,7 @@ def test_system_event_handler(dispatcher, current_time):
         error_type="test_error",
         error_message="Test error occurred",
         timestamp=current_time,
-        details={"stack_trace": "..."}
+        details={"stack_trace": "..."},
     )
     dispatcher.dispatch(error_event)
 
@@ -283,10 +268,7 @@ def test_event_history(dispatcher, current_time):
     """Test event history management."""
     # Add events
     for i in range(1100):  # More than _max_history
-        event = SystemStatusEvent(
-            status=f"test_{i}",
-            timestamp=current_time
-        )
+        event = SystemStatusEvent(status=f"test_{i}", timestamp=current_time)
         dispatcher.dispatch(event)
 
     # Check history limit
@@ -318,9 +300,7 @@ def test_error_handling(dispatcher, current_time):
     dispatcher.subscribe(failing_handler, "test_event")
 
     event = SystemStatusEvent(
-        status="test",
-        timestamp=current_time,
-        event_type="test_event"
+        status="test", timestamp=current_time, event_type="test_event"
     )
 
     # Should not raise exception
@@ -336,9 +316,7 @@ def test_error_handling(dispatcher, current_time):
     # Test validation error
     with pytest.raises(ValueError):
         invalid_event = SystemStatusEvent(
-            status="test",
-            timestamp="invalid",  # type: ignore
-            event_type="test_event"
+            status="test", timestamp="invalid", event_type="test_event"  # type: ignore
         )
         dispatcher.dispatch(invalid_event)
 
@@ -355,9 +333,7 @@ def test_multiple_handlers(dispatcher, current_time):
     dispatcher.subscribe(handler2, "test_event")
 
     event = SystemStatusEvent(
-        status="test",
-        timestamp=current_time,
-        event_type="test_event"
+        status="test", timestamp=current_time, event_type="test_event"
     )
     dispatcher.dispatch(event)
 

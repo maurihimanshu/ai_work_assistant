@@ -51,7 +51,7 @@ class ModelManager:
         joblib.dump(model, model_path)
 
         # Save metadata
-        with open(meta_path, 'w') as f:
+        with open(meta_path, "w") as f:
             json.dump(metadata, f, indent=2, default=str)
 
         # Update current model and metadata
@@ -83,10 +83,7 @@ class ModelManager:
         return model, metadata
 
     def _evaluate_model(
-        self,
-        model: BaseEstimator,
-        X_test: np.ndarray,
-        y_test: np.ndarray
+        self, model: BaseEstimator, X_test: np.ndarray, y_test: np.ndarray
     ) -> Dict[str, float]:
         """Evaluate model performance.
 
@@ -100,23 +97,18 @@ class ModelManager:
         """
         y_pred = model.predict(X_test)
         precision, recall, f1, _ = precision_recall_fscore_support(
-            y_test,
-            y_pred,
-            average='weighted'
+            y_test, y_pred, average="weighted"
         )
 
         return {
-            'accuracy': accuracy_score(y_test, y_pred),
-            'precision': precision,
-            'recall': recall,
-            'f1_score': f1
+            "accuracy": accuracy_score(y_test, y_pred),
+            "precision": precision,
+            "recall": recall,
+            "f1_score": f1,
         }
 
     def train_model(
-        self,
-        activities: List[Activity],
-        test_size: float = 0.2,
-        random_state: int = 42
+        self, activities: List[Activity], test_size: float = 0.2, random_state: int = 42
     ) -> Dict[str, float]:
         """Train a new model on activity data.
 
@@ -134,23 +126,18 @@ class ModelManager:
             raise ValueError("No features extracted from activities")
 
         # Prepare target variable (next app prediction)
-        app_ids = features_df['app_id'].values
+        app_ids = features_df["app_id"].values
         y = np.roll(app_ids, -1)  # Shift app_ids by -1 to get next app
         y = y[:-1]  # Remove last row as we don't know the next app
         X = features_df.iloc[:-1].values  # Remove last row to match y
 
         # Split data
         X_train, X_test, y_train, y_test = train_test_split(
-            X, y,
-            test_size=test_size,
-            random_state=random_state
+            X, y, test_size=test_size, random_state=random_state
         )
 
         # Train model
-        model = RandomForestClassifier(
-            n_estimators=100,
-            random_state=random_state
-        )
+        model = RandomForestClassifier(n_estimators=100, random_state=random_state)
         model.fit(X_train, y_train)
 
         # Evaluate model
@@ -158,19 +145,18 @@ class ModelManager:
 
         # Save model and metadata
         metadata = {
-            'trained_at': datetime.now(),
-            'n_samples': len(X),
-            'feature_names': self.feature_extractor.get_feature_names(),
-            'metrics': metrics,
-            'parameters': model.get_params()
+            "trained_at": datetime.now(),
+            "n_samples": len(X),
+            "feature_names": self.feature_extractor.get_feature_names(),
+            "metrics": metrics,
+            "parameters": model.get_params(),
         }
         self._save_model(model, metadata)
 
         return metrics
 
     def predict_next_activity(
-        self,
-        current_activities: List[Activity]
+        self, current_activities: List[Activity]
     ) -> Optional[str]:
         """Predict the next application based on current activities.
 

@@ -20,6 +20,7 @@ from pathlib import Path
 # Project root directory
 PROJECT_ROOT = Path(__file__).parent.parent.absolute()
 
+
 def clean():
     """Clean build artifacts and temporary files."""
     print("Cleaning build artifacts...")
@@ -34,7 +35,7 @@ def clean():
         "htmlcov",
         "__pycache__",
         ".mypy_cache",
-        "logs/*.log"
+        "logs/*.log",
     ]
 
     for pattern in clean_paths:
@@ -45,6 +46,7 @@ def clean():
                 path.unlink()
 
     print("Clean completed!")
+
 
 def run_tests(coverage=True):
     """Run test suite with optional coverage report.
@@ -59,11 +61,7 @@ def run_tests(coverage=True):
 
     # Add coverage if requested
     if coverage:
-        cmd.extend([
-            "--cov=src",
-            "--cov-report=term-missing",
-            "--cov-report=html"
-        ])
+        cmd.extend(["--cov=src", "--cov-report=term-missing", "--cov-report=html"])
 
     # Run tests
     result = subprocess.run(cmd, cwd=PROJECT_ROOT)
@@ -74,6 +72,7 @@ def run_tests(coverage=True):
 
     print("Tests completed successfully!")
 
+
 def run_linters():
     """Run code quality checks."""
     print("Running linters...")
@@ -82,7 +81,7 @@ def run_linters():
         ["black", "--check", "src", "tests"],
         ["isort", "--check-only", "src", "tests"],
         ["mypy", "src"],
-        ["flake8", "src", "tests"]
+        ["flake8", "src", "tests"],
     ]
 
     for cmd in linter_commands:
@@ -94,6 +93,7 @@ def run_linters():
 
     print("\nAll linter checks passed!")
 
+
 def build_package():
     """Build Python package using setuptools."""
     print("Building Python package...")
@@ -102,13 +102,10 @@ def build_package():
     clean()
 
     # Build package
-    subprocess.run(
-        [sys.executable, "-m", "build"],
-        cwd=PROJECT_ROOT,
-        check=True
-    )
+    subprocess.run([sys.executable, "-m", "build"], cwd=PROJECT_ROOT, check=True)
 
     print("Package build completed!")
+
 
 def build_executable():
     """Create standalone executable using PyInstaller."""
@@ -125,7 +122,7 @@ def build_executable():
         "--hidden-import=numpy",
         "--hidden-import=pandas",
         "--hidden-import=scikit-learn",
-        "src/main.py"
+        "src/main.py",
     ]
 
     # Run PyInstaller
@@ -137,6 +134,7 @@ def build_executable():
 
     print("Executable created successfully!")
 
+
 def setup_dev_environment():
     """Set up development environment."""
     print("Setting up development environment...")
@@ -145,71 +143,40 @@ def setup_dev_environment():
     subprocess.run(
         [sys.executable, "-m", "pip", "install", "-e", ".[dev]"],
         cwd=PROJECT_ROOT,
-        check=True
+        check=True,
     )
 
     # Install pre-commit hooks
-    subprocess.run(
-        ["pre-commit", "install"],
-        cwd=PROJECT_ROOT,
-        check=True
-    )
+    subprocess.run(["pre-commit", "install"], cwd=PROJECT_ROOT, check=True)
 
     print("Development environment setup completed!")
 
+
 def main():
     """Main entry point for build script."""
-    parser = argparse.ArgumentParser(
-        description="Build script for AI Work Assistant"
+    parser = argparse.ArgumentParser(description="Build script for AI Work Assistant")
+
+    parser.add_argument("--clean", action="store_true", help="Clean build artifacts")
+
+    parser.add_argument("--test", action="store_true", help="Run test suite")
+
+    parser.add_argument(
+        "--no-coverage", action="store_true", help="Run tests without coverage report"
+    )
+
+    parser.add_argument("--lint", action="store_true", help="Run linter checks")
+
+    parser.add_argument("--package", action="store_true", help="Build Python package")
+
+    parser.add_argument(
+        "--exe", action="store_true", help="Create standalone executable"
     )
 
     parser.add_argument(
-        "--clean",
-        action="store_true",
-        help="Clean build artifacts"
+        "--dev-setup", action="store_true", help="Set up development environment"
     )
 
-    parser.add_argument(
-        "--test",
-        action="store_true",
-        help="Run test suite"
-    )
-
-    parser.add_argument(
-        "--no-coverage",
-        action="store_true",
-        help="Run tests without coverage report"
-    )
-
-    parser.add_argument(
-        "--lint",
-        action="store_true",
-        help="Run linter checks"
-    )
-
-    parser.add_argument(
-        "--package",
-        action="store_true",
-        help="Build Python package"
-    )
-
-    parser.add_argument(
-        "--exe",
-        action="store_true",
-        help="Create standalone executable"
-    )
-
-    parser.add_argument(
-        "--dev-setup",
-        action="store_true",
-        help="Set up development environment"
-    )
-
-    parser.add_argument(
-        "--all",
-        action="store_true",
-        help="Run all build steps"
-    )
+    parser.add_argument("--all", action="store_true", help="Run all build steps")
 
     args = parser.parse_args()
 
@@ -253,5 +220,7 @@ def main():
         print(f"Unexpected error: {e}")
         sys.exit(1)
 
+
 if __name__ == "__main__":
     main()
+ 

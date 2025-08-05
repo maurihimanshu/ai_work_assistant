@@ -33,5 +33,5 @@ def sample_activity():
         window_title="Test Window",
         process_id=1234,
         executable_path="/path/to/test",
-        start_time=datetime.now()
+        start_time=datetime.now(),
     )
