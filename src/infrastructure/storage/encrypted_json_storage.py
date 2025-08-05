@@ -23,6 +23,7 @@ from core.interfaces.activity_repository import ActivityRepository
 
 logger = logging.getLogger(__name__)
 
+
 class EncryptedJsonStorage(ActivityRepository):
     """Encrypted JSON storage implementation using Fernet encryption."""
 
@@ -55,7 +56,9 @@ class EncryptedJsonStorage(ActivityRepository):
             if self.key_path.exists():
                 logger.debug("Using existing encryption key")
                 key = self.key_path.read_bytes()
-                if key and len(key) == 44:  # Base64 encoded Fernet key is always 44 bytes
+                if (
+                    key and len(key) == 44
+                ):  # Base64 encoded Fernet key is always 44 bytes
                     self.encryption_key = key
                     self.fernet = Fernet(key)
 
@@ -67,7 +70,9 @@ class EncryptedJsonStorage(ActivityRepository):
                             logger.info(f"Found {activity_count} existing activities")
                             return
                         except Exception as e:
-                            logger.warning(f"Could not read storage with existing key: {e}")
+                            logger.warning(
+                                f"Could not read storage with existing key: {e}"
+                            )
                 else:
                     logger.warning("Invalid key format")
             else:
@@ -285,9 +290,7 @@ class EncryptedJsonStorage(ActivityRepository):
             List of activities within the range
         """
         try:
-            logger.debug(
-                f"Retrieving activities between {start_time} and {end_time}"
-            )
+            logger.debug(f"Retrieving activities between {start_time} and {end_time}")
 
             data = self._load_data()
             activities = []
@@ -302,10 +305,7 @@ class EncryptedJsonStorage(ActivityRepository):
                     )
 
                     # Include activities that overlap with the time range
-                    if (
-                        activity_start <= end_time and
-                        activity_end >= start_time
-                    ):
+                    if activity_start <= end_time and activity_end >= start_time:
                         activity = self._dict_to_activity(activity_data)
                         activities.append(activity)
                         logger.debug(
@@ -320,8 +320,7 @@ class EncryptedJsonStorage(ActivityRepository):
 
                 except Exception as e:
                     logger.error(
-                        f"Error processing activity {activity_id}: {e}",
-                        exc_info=True
+                        f"Error processing activity {activity_id}: {e}", exc_info=True
                     )
 
             logger.info(f"Found {len(activities)} activities in time range")

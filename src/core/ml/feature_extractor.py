@@ -52,7 +52,7 @@ class ActivityFeatureExtractor:
                     duration / 3600.0,  # Convert to hours
                     active_time / duration if duration > 0 else 0,
                     idle_time / duration if duration > 0 else 0,
-                    productivity
+                    productivity,
                 ]
                 features.append(feature_vector)
 

@@ -32,10 +32,13 @@ def _convert_to_dict(activity: Activity) -> Dict:
         "end_time": activity.end_time,
         "app_name": activity.app_name,
         "window_title": activity.window_title,
-        "duration": (activity.end_time - activity.start_time).total_seconds() if activity.end_time else 0,
+        "duration": (activity.end_time - activity.start_time).total_seconds()
+        if activity.end_time
+        else 0,
         "active_time": activity.active_time,
         "idle_time": activity.idle_time,
     }
+
 
 class TaskSuggestionService:
     """Service for analyzing work patterns and suggesting tasks."""
@@ -153,11 +156,13 @@ class TaskSuggestionService:
             categories = self.categorizer.get_activity_insights(activity_dicts)
 
             # Low productivity suggestions
-            suggestions.extend([
-                "Take a short break to refresh",
-                "Switch to a different task type",
-                "Set a focused work timer (25 minutes)",
-            ])
+            suggestions.extend(
+                [
+                    "Take a short break to refresh",
+                    "Switch to a different task type",
+                    "Set a focused work timer (25 minutes)",
+                ]
+            )
 
             # Add category-specific suggestions
             if categories.get("category_distribution"):
@@ -192,8 +197,8 @@ class TaskSuggestionService:
         if predictions:
             for pred in predictions[:2]:  # Only use top 2 predictions
                 if isinstance(pred, dict):
-                    activity_type = pred.get('type', '')
-                    confidence = pred.get('confidence', 0)
+                    activity_type = pred.get("type", "")
+                    confidence = pred.get("confidence", 0)
                     if activity_type and confidence > 0.3:
                         suggestions.append(
                             f"Consider switching to {activity_type} (confidence: {confidence:.1%})"
@@ -351,8 +356,7 @@ class TaskSuggestionService:
             start_time = end_time - time_window
 
             recent_activities = self.repository.get_by_timerange(
-                start_time=start_time,
-                end_time=end_time
+                start_time=start_time, end_time=end_time
             )
 
             if not recent_activities:
@@ -369,8 +373,8 @@ class TaskSuggestionService:
             suggestions = []
             for pred in predictions:
                 if isinstance(pred, dict):
-                    activity_type = pred.get('type', '')
-                    confidence = pred.get('confidence', 0)
+                    activity_type = pred.get("type", "")
+                    confidence = pred.get("confidence", 0)
                     if activity_type and confidence > 0.3:
                         suggestions.append(
                             f"Consider {activity_type} (confidence: {confidence:.1%})"
@@ -380,7 +384,9 @@ class TaskSuggestionService:
 
             # If no ML predictions or not enough suggestions, add time-based ones
             if len(suggestions) < 3:
-                time_suggestions = self._get_time_based_suggestions(end_time, recent_activities)
+                time_suggestions = self._get_time_based_suggestions(
+                    end_time, recent_activities
+                )
                 suggestions.extend(time_suggestions)
 
             # Add productivity-based suggestions if needed

@@ -30,6 +30,7 @@ from infrastructure.os.platform_monitor import PlatformMonitor
 # Configure logger
 logger = logging.getLogger(__name__)
 
+
 class ActivityMonitor:
     """Service for monitoring and tracking user activity."""
 
@@ -97,8 +98,12 @@ class ActivityMonitor:
             bool: True if user is idle, False otherwise
         """
         idle_time = self.platform_monitor.get_idle_time()
-        logger.debug(f"Current idle time: {idle_time:.1f}s (threshold: {self.idle_threshold}s)")
-        return idle_time >= self.idle_threshold or self.platform_monitor.is_screen_locked()
+        logger.debug(
+            f"Current idle time: {idle_time:.1f}s (threshold: {self.idle_threshold}s)"
+        )
+        return (
+            idle_time >= self.idle_threshold or self.platform_monitor.is_screen_locked()
+        )
 
     def _handle_activity_change(
         self, app_name: str, window_title: str, process_id: int, executable_path: str
@@ -117,7 +122,9 @@ class ActivityMonitor:
         if self.current_activity:
             self.current_activity.end_time = current_time
             duration = (current_time - self.current_activity.start_time).total_seconds()
-            total_time = self.current_activity.active_time + self.current_activity.idle_time
+            total_time = (
+                self.current_activity.active_time + self.current_activity.idle_time
+            )
 
             logger.info(
                 f"Ending activity: {self.current_activity.app_name} "
@@ -148,9 +155,7 @@ class ActivityMonitor:
             idle_time=0.0,
         )
 
-        logger.info(
-            f"Starting activity: {app_name} ({window_title})"
-        )
+        logger.info(f"Starting activity: {app_name} ({window_title})")
 
         # Dispatch activity start event
         self.event_dispatcher.dispatch(
@@ -311,7 +316,7 @@ class ActivityMonitor:
         self._monitoring_thread = threading.Thread(
             target=self._monitoring_loop,
             name="ActivityMonitorThread",
-            daemon=True  # Thread will be terminated when main thread exits
+            daemon=True,  # Thread will be terminated when main thread exits
         )
         self._monitoring_thread.start()
 

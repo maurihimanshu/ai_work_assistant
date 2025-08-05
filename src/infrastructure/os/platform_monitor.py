@@ -11,6 +11,7 @@ from .windows_monitor import WindowsMonitor
 
 logger = logging.getLogger(__name__)
 
+
 class PlatformMonitor:
     """Platform-agnostic monitor that delegates to platform-specific implementations."""
 
