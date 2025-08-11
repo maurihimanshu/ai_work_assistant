@@ -32,6 +32,7 @@ def _convert_to_dict(activity: Activity) -> Dict:
         "end_time": activity.end_time,
         "app_name": activity.app_name,
         "window_title": activity.window_title,
+        "executable_path": activity.executable_path,
         "duration": (activity.end_time - activity.start_time).total_seconds()
         if activity.end_time
         else 0,

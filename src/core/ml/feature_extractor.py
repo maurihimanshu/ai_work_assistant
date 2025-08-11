@@ -1,13 +1,15 @@
 """Feature extraction for activity data."""
 
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Union
+from typing import Dict, List
 
 import numpy as np
-import pandas as pd
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder  # noqa: F401
+import logging
 
-from ..entities.activity import Activity
+from ..entities.activity import Activity  # noqa: F401
+
+logger = logging.getLogger(__name__)
 
 
 class ActivityFeatureExtractor:

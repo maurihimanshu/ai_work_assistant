@@ -117,7 +117,7 @@ ai_work_assistant/
 ### 2. Installation
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/ai-work-assistant.git
+git clone https://github.com/maurihimanshu/ai_work_assistant
 
 # Create and activate virtual environment
 python -m venv venv

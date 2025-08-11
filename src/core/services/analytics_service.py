@@ -55,7 +55,7 @@ class AnalyticsService:
             start_time = end_time - time_window
             activities = self.repository.get_by_timerange(start_time, end_time)
 
-            logger.info(
+            logger.debug(
                 f"Generating productivity report for {len(activities)} activities"
             )
 
@@ -74,11 +74,15 @@ class AnalyticsService:
                     if activity.end_time
                     else 0
                 )
+                # Filter extremely short events (< 2 seconds) from analytics
+                if duration < 2:
+                    continue
                 activity_dict = {
                     "start_time": activity.start_time,
                     "end_time": activity.end_time,
                     "app_name": activity.app_name,
                     "window_title": activity.window_title,
+                    "executable_path": activity.executable_path,
                     "duration": duration,
                     "active_time": activity.active_time,
                     "idle_time": activity.idle_time,
@@ -101,17 +105,21 @@ class AnalyticsService:
             # Calculate app patterns
             app_patterns = {}
             for activity in activity_dicts:
-                app_name = activity["app_name"]
-                if app_name not in app_patterns:
-                    app_patterns[app_name] = {
+                # Use executable basename when available for consistent mapping
+                exe_or_name = activity.get("executable_path") or activity.get(
+                    "app_name", ""
+                )
+                key = str(exe_or_name).split("\\")[-1].split("/")[-1]
+                if key not in app_patterns:
+                    app_patterns[key] = {
                         "total_time": 0,
                         "active_time": 0,
                         "idle_time": 0,
                         "usage_percentage": 0,
                     }
-                app_patterns[app_name]["total_time"] += activity["duration"]
-                app_patterns[app_name]["active_time"] += activity["active_time"]
-                app_patterns[app_name]["idle_time"] += activity["idle_time"]
+                app_patterns[key]["total_time"] += activity["duration"]
+                app_patterns[key]["active_time"] += activity["active_time"]
+                app_patterns[key]["idle_time"] += activity["idle_time"]
 
             # Calculate usage percentages
             if total_time > 0:
@@ -121,9 +129,11 @@ class AnalyticsService:
             # Calculate category patterns
             category_patterns = {}
             for activity in activity_dicts:
-                category = insights.get("categories", {}).get(
-                    activity["app_name"], "Unknown"
+                exe_or_name = activity.get("executable_path") or activity.get(
+                    "app_name", ""
                 )
+                key = str(exe_or_name).split("\\")[-1].split("/")[-1].lower()
+                category = insights.get("categories", {}).get(key, "Unknown")
                 if category not in category_patterns:
                     category_patterns[category] = {
                         "total_time": 0,
@@ -131,13 +141,9 @@ class AnalyticsService:
                         "usage_percentage": 0,
                     }
                 category_patterns[category]["total_time"] += activity["duration"]
-                if activity["app_name"] not in category_patterns[category].get(
-                    "apps", set()
-                ):
+                if key not in category_patterns[category].get("apps", set()):
                     category_patterns[category]["app_count"] += 1
-                    category_patterns[category].setdefault("apps", set()).add(
-                        activity["app_name"]
-                    )
+                    category_patterns[category].setdefault("apps", set()).add(key)
 
             # Calculate category usage percentages
             if total_time > 0:
@@ -169,7 +175,7 @@ class AnalyticsService:
                     hourly_counts[hour] += 1
                     daily_counts[day] += 1
 
-            logger.info("Successfully generated productivity report")
+            logger.debug("Successfully generated productivity report")
 
             return {
                 "daily_metrics": daily_metrics,

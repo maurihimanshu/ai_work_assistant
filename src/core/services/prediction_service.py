@@ -24,6 +24,8 @@ class PredictionService:
         min_activities_for_prediction: int = 5,
         load_initial_data: bool = True,  # Changed default to True
         training_window: timedelta = timedelta(days=7),  # Added training window
+        min_duration_seconds: float = 2.0,
+        recent_buffer_size: int = 20,
     ):
         """Initialize prediction service.
 
@@ -35,6 +37,8 @@ class PredictionService:
             min_activities_for_prediction: Minimum activities needed
             load_initial_data: Whether to load initial data during initialization
             training_window: Time window for initial training data
+            min_duration_seconds: Filter out events shorter than this during training/prediction
+            recent_buffer_size: Max events to pass into predictor as context
         """
         self.repository = repository
         self.learner = learner
@@ -42,6 +46,8 @@ class PredictionService:
         self.prediction_window = prediction_window
         self.min_activities_for_prediction = min_activities_for_prediction
         self.training_window = training_window
+        self.min_duration_seconds = min_duration_seconds
+        self.recent_buffer_size = recent_buffer_size
 
         # Load initial data if requested
         if load_initial_data:
@@ -64,11 +70,14 @@ class PredictionService:
             for activity in activities:
                 if activity.end_time:  # Only include completed activities
                     duration = (activity.end_time - activity.start_time).total_seconds()
+                    if duration < self.min_duration_seconds:
+                        continue
                     activity_dict = {
                         "start_time": activity.start_time,
                         "end_time": activity.end_time,
                         "app_name": activity.app_name,
                         "window_title": activity.window_title,
+                        "executable_path": activity.executable_path,
                         "duration": duration,
                         "active_time": activity.active_time,
                         "idle_time": activity.idle_time,
@@ -109,11 +118,14 @@ class PredictionService:
             for activity in activities:
                 if activity.end_time:  # Only include completed activities
                     duration = (activity.end_time - activity.start_time).total_seconds()
+                    if duration < self.min_duration_seconds:
+                        continue
                     activity_dict = {
                         "start_time": activity.start_time,
                         "end_time": activity.end_time,
                         "app_name": activity.app_name,
                         "window_title": activity.window_title,
+                        "executable_path": activity.executable_path,
                         "duration": duration,
                         "active_time": activity.active_time,
                         "idle_time": activity.idle_time,
@@ -153,16 +165,23 @@ class PredictionService:
             for activity in activities:
                 if activity.end_time:
                     duration = (activity.end_time - activity.start_time).total_seconds()
+                    if duration < self.min_duration_seconds:
+                        continue
                     activity_dict = {
                         "start_time": activity.start_time,
                         "end_time": activity.end_time,
                         "app_name": activity.app_name,
                         "window_title": activity.window_title,
+                        "executable_path": activity.executable_path,
                         "duration": duration,
                         "active_time": activity.active_time,
                         "idle_time": activity.idle_time,
                     }
                     activity_dicts.append(activity_dict)
+
+            # Provide only the most recent N events as context
+            if len(activity_dicts) > self.recent_buffer_size:
+                activity_dicts = activity_dicts[-self.recent_buffer_size :]
 
             # Make prediction
             return self.learner.predict_next(activity_dicts)
@@ -206,11 +225,14 @@ class PredictionService:
             for activity in activities:
                 if activity.end_time:
                     duration = (activity.end_time - activity.start_time).total_seconds()
+                    if duration < self.min_duration_seconds:
+                        continue
                     activity_dict = {
                         "start_time": activity.start_time,
                         "end_time": activity.end_time,
                         "app_name": activity.app_name,
                         "window_title": activity.window_title,
+                        "executable_path": activity.executable_path,
                         "duration": duration,
                         "active_time": activity.active_time,
                         "idle_time": activity.idle_time,
