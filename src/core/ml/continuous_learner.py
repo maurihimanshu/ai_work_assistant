@@ -10,6 +10,7 @@ import joblib
 import numpy as np
 from sklearn.base import BaseEstimator
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import SGDClassifier
 
 from ..entities.activity import Activity
 from .feature_extractor import ActivityFeatureExtractor
@@ -20,21 +21,38 @@ logger = logging.getLogger(__name__)
 class ContinuousLearner:
     """Continuous learning model for activity prediction."""
 
-    def __init__(self, model_dir: str = None, event_dispatcher=None):
+    def __init__(
+        self, model_dir: str = None, event_dispatcher=None, use_online: bool = False
+    ):
         """Initialize continuous learner.
 
         Args:
             model_dir: Directory to save/load model
             event_dispatcher: Event dispatcher instance
+            use_online: If True, use an incremental model with partial_fit
         """
         self.model_dir = model_dir or "data/models"
         self.event_dispatcher = event_dispatcher
         self.feature_extractor = ActivityFeatureExtractor()
-        self.model = RandomForestClassifier(
-            n_estimators=100, max_depth=10, random_state=42
-        )
+        self.use_online = use_online
+        if use_online:
+            # Linear classifier with hinge loss; supports partial_fit
+            self.model = SGDClassifier(loss="log_loss", alpha=1e-4, random_state=42)
+            self._known_classes = None
+        else:
+            self.model = RandomForestClassifier(
+                n_estimators=100, max_depth=10, random_state=42
+            )
         self.is_fitted = False
         self._load_model()
+
+    def _get_model_path(self) -> str:
+        filename = (
+            "activity_model_online.joblib"
+            if self.use_online
+            else "activity_model.joblib"
+        )
+        return os.path.join(self.model_dir, filename)
 
     def _load_model(self) -> None:
         """Load model from disk if available."""
@@ -42,11 +60,24 @@ class ContinuousLearner:
             if not os.path.exists(self.model_dir):
                 os.makedirs(self.model_dir)
 
-            model_path = os.path.join(self.model_dir, "activity_model.joblib")
+            model_path = self._get_model_path()
             if os.path.exists(model_path):
                 self.model = joblib.load(model_path)
                 self.is_fitted = True
                 logger.info("Loaded existing model")
+                # If in online mode but loaded model doesn't support partial_fit, reset to SGD
+                if self.use_online and not hasattr(self.model, "partial_fit"):
+                    logger.warning(
+                        "Loaded model is not incremental; reinitializing SGDClassifier"
+                    )
+                    self.model = SGDClassifier(
+                        loss="log_loss", alpha=1e-4, random_state=42
+                    )
+                    self.is_fitted = False
+                    self._known_classes = None
+                elif self.use_online:
+                    # Recover known classes from the persisted estimator if available
+                    self._known_classes = getattr(self.model, "classes_", None)
             else:
                 logger.info("No existing model found")
 
@@ -59,12 +90,58 @@ class ContinuousLearner:
             if not os.path.exists(self.model_dir):
                 os.makedirs(self.model_dir)
 
-            model_path = os.path.join(self.model_dir, "activity_model.joblib")
+            model_path = self._get_model_path()
             joblib.dump(self.model, model_path)
             logger.info("Saved model to disk")
 
         except Exception as e:
             logger.error(f"Error saving model: {e}", exc_info=True)
+
+    def _ensure_incremental_estimator(self) -> None:
+        """Ensure the estimator supports partial_fit in online mode."""
+        if not hasattr(self.model, "partial_fit"):
+            self.model = SGDClassifier(loss="log_loss", alpha=1e-4, random_state=42)
+            self.is_fitted = False
+            self._known_classes = None
+
+    def _reinitialize_with_classes(self, classes: np.ndarray) -> None:
+        """Reinitialize incremental model with a new class set."""
+        logger.warning(
+            "Reinitializing incremental model with updated classes: %s", list(classes)
+        )
+        self.model = SGDClassifier(loss="log_loss", alpha=1e-4, random_state=42)
+        self.is_fitted = False
+        self._known_classes = np.array(sorted(np.unique(classes)))
+
+    def _initial_partial_fit(self, X: np.ndarray, y: np.ndarray) -> None:
+        """Perform the first partial_fit call establishing the class set."""
+        self._ensure_incremental_estimator()
+        if self._known_classes is None:
+            self._known_classes = np.array(sorted(np.unique(y)))
+        self.model.partial_fit(X, y, classes=self._known_classes)
+        self.is_fitted = True
+
+    def _incremental_partial_fit(self, X: np.ndarray, y: np.ndarray) -> None:
+        """Perform subsequent partial_fit calls without changing class set."""
+        # If classifier has classes_, use them; otherwise initialize
+        model_classes = getattr(self.model, "classes_", None)
+        if model_classes is None or not self.is_fitted:
+            self._initial_partial_fit(X, y)
+            return
+        # If y contains unseen labels, we must reinitialize to expand class set
+        unique_new = np.unique(y)
+        unseen = [c for c in unique_new if c not in model_classes]
+        if unseen:
+            # Expand classes and reinit; first call must include full class set
+            expanded = np.array(
+                sorted(np.unique(np.concatenate([model_classes, unique_new])))
+            )
+            self._reinitialize_with_classes(expanded)
+            self.model.partial_fit(X, y, classes=self._known_classes)
+            self.is_fitted = True
+            return
+        # Safe to update without classes argument
+        self.model.partial_fit(X, y)
 
     def fit(self, activities: List[Dict]) -> None:
         """Train model on activities.
@@ -86,8 +163,15 @@ class ContinuousLearner:
                 return
 
             # Train model
-            self.model.fit(X, y)
-            self.is_fitted = True
+            if self.use_online:
+                self._ensure_incremental_estimator()
+                if not self.is_fitted or getattr(self.model, "classes_", None) is None:
+                    self._initial_partial_fit(X, y)
+                else:
+                    self._incremental_partial_fit(X, y)
+            else:
+                self.model.fit(X, y)
+                self.is_fitted = True
             logger.info(f"Model trained on {len(X)} samples")
 
             # Save model
@@ -163,10 +247,13 @@ class ContinuousLearner:
             if len(X_new) == 0 or len(y_new) == 0:
                 return
 
-            # Partial fit not available for RandomForest, so we retrain
-            # In a production system, we might want to use a different model
-            # that supports partial_fit, or maintain a buffer of recent data
-            self.model.fit(X_new, y_new)
+            if self.use_online:
+                self._ensure_incremental_estimator()
+                self._incremental_partial_fit(X_new, y_new)
+            else:
+                # Retrain on new batch
+                self.model.fit(X_new, y_new)
+                self.is_fitted = True
             self._save_model()
 
             logger.info(f"Model updated with {len(X_new)} new samples")

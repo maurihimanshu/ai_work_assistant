@@ -6,7 +6,9 @@ python-jose[cryptography]==3.3.0  # For JWT handling
 python-multipart==0.0.6  # For form data processing
 
 # UI Framework
-PyQt6==6.6.1        # Qt GUI framework
+PySide6==6.6.1       # Qt GUI framework (replacing PyQt6 for better compatibility)
+numpy==1.26.3        # Required for chart calculations and data processing
+pillow==10.2.0       # For image handling in UI components
 
 # API Framework
 fastapi==0.109.0    # FastAPI framework
@@ -17,6 +19,8 @@ httpx==0.26.0       # For async HTTP client
 # OS Integration
 psutil==5.9.6        # Cross-platform system monitoring
 pywin32==306; sys_platform == 'win32'  # Windows-specific functionality
+python-xlib==0.33; sys_platform == 'linux'  # Linux X11 support
+pyobjc-framework-Cocoa==10.1; sys_platform == 'darwin'  # macOS support
 
 # Activity Monitoring
 keyboard==0.13.5     # Keyboard event monitoring
@@ -31,13 +35,19 @@ aiosqlite==0.19.0    # For async SQLite support
 scikit-learn==1.3.2  # Machine learning library
 joblib==1.3.2        # For model persistence
 
+# Data Visualization
+matplotlib==3.8.2    # Additional charting capabilities
+seaborn==0.13.1     # Statistical data visualization
+
 # Testing
 pytest==7.4.4        # Testing framework
 pytest-cov==4.1.0    # Test coverage
 pytest-mock==3.12.0  # Mocking functionality
+pytest-qt==4.3.1     # Qt-specific testing support
 
 # Development Tools
 black==23.11.0       # Code formatting
 isort==5.12.0        # Import sorting
 flake8==6.1.0        # Code linting
 mypy==1.7.1          # Static type checking
+qt-material==2.14    # Material design themes for Qt

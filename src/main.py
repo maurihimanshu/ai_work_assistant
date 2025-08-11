@@ -5,7 +5,7 @@ import os
 import sys
 from pathlib import Path
 
-from PyQt6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication
 
 from core.events.event_dispatcher import EventDispatcher
 from core.ml.activity_categorizer import ActivityCategorizer
@@ -17,8 +17,17 @@ from core.services.session_service import SessionService
 from core.services.task_suggestion_service import TaskSuggestionService
 from infrastructure.os.platform_monitor import PlatformMonitor
 from infrastructure.storage.encrypted_json_storage import EncryptedJsonStorage
+from infrastructure.storage.daily_encrypted_json_storage import (
+    DailyEncryptedJsonStorage,
+)
 from presentation.ui.dashboard import Dashboard
 from presentation.ui.system_tray import SystemTrayApp
+from presentation.ui.utils.service_connector import ServiceConnector
+from presentation.ui.utils.log_handler import QtLogHandler
+from presentation.ui.utils.theme import apply_theme
+
+# Create Qt log handler
+qt_log_handler = QtLogHandler()
 
 # Configure logging
 logging.basicConfig(
@@ -27,6 +36,7 @@ logging.basicConfig(
     handlers=[
         logging.StreamHandler(),
         logging.FileHandler("logs/app.log", encoding="utf-8"),
+        qt_log_handler,  # Add Qt handler
     ],
 )
 
@@ -47,11 +57,7 @@ def setup_data_directories():
 
 
 def initialize_services():
-    """Initialize all application services.
-
-    Returns:
-        tuple: Initialized service instances
-    """
+    """Initialize all application services."""
     try:
         # Initialize event system
         logger.info("Initializing event system...")
@@ -59,8 +65,8 @@ def initialize_services():
 
         # Initialize data storage
         logger.info("Initializing data storage...")
-        activity_storage = EncryptedJsonStorage(
-            "data/activities/activities.json",
+        activity_storage = DailyEncryptedJsonStorage(
+            "data/activities",
             encryption_key_file="data/activities/key.key",
         )
 
@@ -68,7 +74,7 @@ def initialize_services():
         logger.info("Initializing ML components...")
         logger.info("Initializing continuous learner...")
         learner = ContinuousLearner(
-            model_dir="data/models", event_dispatcher=event_dispatcher
+            model_dir="data/models", event_dispatcher=event_dispatcher, use_online=False
         )
 
         # Initialize activity categorizer
@@ -117,6 +123,14 @@ def initialize_services():
             learner=learner,
         )
 
+        # Initialize service connector for UI
+        logger.info("Initializing service connector...")
+        service_connector = ServiceConnector(
+            analytics_service=analytics_service,
+            session_service=session_service,
+            suggestion_service=suggestion_service,
+        )
+
         return (
             event_dispatcher,
             activity_storage,
@@ -125,6 +139,7 @@ def initialize_services():
             session_service,
             prediction_service,
             suggestion_service,
+            service_connector,  # Add service connector to return tuple
         )
 
     except Exception as e:
@@ -144,6 +159,8 @@ def main():
         logger.info("Initializing Qt application...")
         app = QApplication(sys.argv)
         app.setQuitOnLastWindowClosed(False)
+        # Apply modern theme
+        apply_theme(app)
 
         # Initialize services
         logger.info("Initializing services...")
@@ -155,26 +172,12 @@ def main():
             session_service,
             prediction_service,
             suggestion_service,
+            service_connector,
         ) = initialize_services()
 
         # Create system tray application
         logger.info("Creating system tray application...")
-        system_tray = SystemTrayApp(
-            activity_monitor=activity_monitor,
-            session_service=session_service,
-            analytics_service=analytics_service,
-            suggestion_service=suggestion_service,
-            event_dispatcher=event_dispatcher,
-        )
-
-        # Create and show dashboard
-        logger.info("Opening dashboard...")
-        dashboard = Dashboard(
-            analytics_service=analytics_service,
-            suggestion_service=suggestion_service,
-            session_service=session_service,
-        )
-        dashboard.show()
+        system_tray = SystemTrayApp(service_connector=service_connector)
 
         # Start activity monitoring
         logger.info("Starting activity monitoring...")
@@ -182,7 +185,7 @@ def main():
 
         logger.info("AI Work Assistant started successfully")
         logger.info("Starting Qt event loop...")
-        sys.exit(app.exec())
+        sys.exit(app.exec())  # Updated from exec_() to exec()
 
     except Exception as e:
         logger.error(f"Failed to start AI Work Assistant: {e}", exc_info=True)

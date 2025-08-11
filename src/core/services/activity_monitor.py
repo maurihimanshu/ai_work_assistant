@@ -252,7 +252,7 @@ class ActivityMonitor:
                     app_name != self.current_activity.app_name
                     or window_title != self.current_activity.window_title
                 ):
-                    logger.info(
+                    logger.debug(
                         f"Activity changed: {self.current_activity.app_name} -> {app_name}"
                     )
                     self._handle_activity_change(
@@ -261,7 +261,7 @@ class ActivityMonitor:
 
             elif not is_idle:
                 # Start new activity if not idle
-                logger.info(f"Starting new activity: {app_name}")
+                logger.debug(f"Starting new activity: {app_name}")
                 self._handle_activity_change(
                     app_name, window_title, process_id, executable_path
                 )
@@ -275,7 +275,7 @@ class ActivityMonitor:
     def _monitoring_loop(self) -> None:
         """Main monitoring loop running in a separate thread."""
         logger = logging.getLogger(__name__)
-        logger.info("Activity monitoring loop started")
+        logger.debug("Activity monitoring loop started")
 
         try:
             while not self._stop_monitoring.is_set():
@@ -285,7 +285,7 @@ class ActivityMonitor:
         except Exception as e:
             logger.error(f"Error in monitoring loop: {e}", exc_info=True)
         finally:
-            logger.info("Activity monitoring loop stopped")
+            logger.debug("Activity monitoring loop stopped")
 
     def start_monitoring(self) -> None:
         """Start the activity monitoring in a separate thread."""
@@ -293,7 +293,7 @@ class ActivityMonitor:
             return  # Already running
 
         logger = logging.getLogger(__name__)
-        logger.info("Starting activity monitoring...")
+        logger.debug("Starting activity monitoring...")
 
         # Add a test activity to verify storage
         try:
@@ -308,7 +308,7 @@ class ActivityMonitor:
                 idle_time=0,
             )
             self.repository.add(test_activity)
-            logger.info("Added test activity to verify storage")
+            logger.debug("Added test activity to verify storage")
         except Exception as e:
             logger.error(f"Error adding test activity: {e}")
 
@@ -334,7 +334,7 @@ class ActivityMonitor:
             return  # Not running
 
         logger = logging.getLogger(__name__)
-        logger.info("Stopping activity monitoring...")
+        logger.debug("Stopping activity monitoring...")
 
         self._stop_monitoring.set()
         if self._monitoring_thread.is_alive():

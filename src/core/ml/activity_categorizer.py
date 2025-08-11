@@ -3,76 +3,58 @@
 import logging
 from typing import Dict, List, Optional
 
+from ..config.categorization_config import CategorizationConfig
+
 logger = logging.getLogger(__name__)
 
 
 class ActivityCategorizer:
     """Categorizes activities based on patterns and rules."""
 
-    def __init__(self):
-        """Initialize activity categorizer."""
-        # Default category mappings
-        self.app_categories = {
-            # Development
-            "vscode.exe": "Development",
-            "code.exe": "Development",
-            "python.exe": "Development",
-            "git.exe": "Development",
-            "powershell.exe": "Development",
-            "cmd.exe": "Development",
-            "WindowsTerminal.exe": "Development",
-            "devenv.exe": "Development",
-            "rider64.exe": "Development",
-            "idea64.exe": "Development",
-            "pycharm64.exe": "Development",
-            "studio64.exe": "Development",
-            "cursor.exe": "Development",
-            # Productivity
-            "outlook.exe": "Communication",
-            "teams.exe": "Communication",
-            "slack.exe": "Communication",
-            "zoom.exe": "Communication",
-            "skype.exe": "Communication",
-            "discord.exe": "Communication",
-            "msteams.exe": "Communication",
-            # Browsers
-            "chrome.exe": "Web Browsing",
-            "firefox.exe": "Web Browsing",
-            "msedge.exe": "Web Browsing",
-            "opera.exe": "Web Browsing",
-            "brave.exe": "Web Browsing",
-            # Office
-            "excel.exe": "Office Work",
-            "word.exe": "Office Work",
-            "powerpnt.exe": "Office Work",
-            "onenote.exe": "Office Work",
-            "winword.exe": "Office Work",
-            "notepad.exe": "Office Work",
-            "notepad++.exe": "Office Work",
-            # Entertainment
-            "spotify.exe": "Entertainment",
-            "vlc.exe": "Entertainment",
-            "steam.exe": "Entertainment",
-            "netflix.exe": "Entertainment",
-            "youtube.exe": "Entertainment",
-            "wmplayer.exe": "Entertainment",
-            # System
-            "explorer.exe": "System",
-            "taskmgr.exe": "System",
-            "control.exe": "System",
-            "systemsettings.exe": "System",
-        }
+    def __init__(self, load_config: bool = True, default_weight: float = 0.5):
+        """Initialize activity categorizer.
 
-        # Productivity scores for categories (0-1)
-        self.category_productivity = {
-            "Development": 0.9,
-            "Communication": 0.8,
-            "Office Work": 0.8,
-            "Web Browsing": 0.6,
-            "System": 0.5,
-            "Entertainment": 0.2,
-            "Unknown": 0.4,
-        }
+        Args:
+            load_config: If True, load overrides from data/config.
+            default_weight: Fallback productivity weight when not configured.
+        """
+        self._config: Optional[CategorizationConfig] = None
+        self._overrides: Dict[str, str] = {}
+        self._weights: Dict[str, float] = {}
+        self._default_weight: float = float(default_weight)
+
+        if load_config:
+            try:
+                self._config = CategorizationConfig.load()
+                self._weights = dict(self._config.category_weights or {})
+            except Exception as e:
+                logger.error(f"Failed to load categorization config: {e}")
+                self._config = None
+                self._weights = {}
+
+    @staticmethod
+    def _basename_lower(path_or_name: str) -> str:
+        return (path_or_name or "").split("\\")[-1].split("/")[-1].lower()
+
+    def _category_for_activity(self, activity: Dict) -> str:
+        # Prefer explicit override
+        exe = activity.get("executable_path") or activity.get("app_name") or ""
+        exe_key = self._basename_lower(exe)
+        if exe_key in self._overrides:
+            return self._overrides[exe_key]
+        # Configured mapping
+        if self._config:
+            configured = self._config.exe_to_category.get(exe_key)
+            if configured:
+                return configured
+        # Unknown if no mapping
+        return "Unknown"
+
+    def _weight_for_category(self, category: str) -> float:
+        try:
+            return float(self._weights.get(category, self._default_weight))
+        except Exception:
+            return self._default_weight
 
     def get_activity_insights(self, activities: List[Dict]) -> Dict:
         """Get insights about activities.
@@ -94,35 +76,39 @@ class ActivityCategorizer:
 
             # Categorize activities
             categories = {}
-            total_time = 0
-            category_time = {}
+            total_time = 0.0
+            category_time: Dict[str, float] = {}
             weighted_productivity = 0.0
             total_weighted_time = 0.0
 
             for activity in activities:
-                app_name = activity.get("app_name", "").lower()
-                duration = activity.get("duration", 0)
-                active_time = activity.get("active_time", 0)
+                duration = float(activity.get("duration", 0) or 0)
+                active_time = float(activity.get("active_time", 0) or 0)
 
                 # Skip invalid activities
                 if duration <= 0:
                     continue
 
                 # Get category
-                category = self.app_categories.get(app_name, "Unknown")
-                categories[app_name] = category
+                category = self._category_for_activity(activity)
+                # Use executable basename as key
+                exe_or_name = (
+                    activity.get("executable_path") or activity.get("app_name") or ""
+                )
+                app_key = self._basename_lower(exe_or_name)
+                categories[app_key] = category
 
                 # Update category time
-                category_time[category] = category_time.get(category, 0) + duration
+                category_time[category] = category_time.get(category, 0.0) + duration
 
-                # Update total time
+                # Update totals
                 total_time += duration
 
                 # Calculate activity productivity
-                activity_productivity = active_time / duration  # Between 0 and 1
-                category_productivity = self.category_productivity.get(
-                    category, 0.4
-                )  # Between 0 and 1
+                activity_productivity = (
+                    (active_time / duration) if duration > 0 else 0.0
+                )
+                category_productivity = self._weight_for_category(category)
 
                 # Weight productivity by duration and category
                 weighted_productivity += (
@@ -138,10 +124,10 @@ class ActivityCategorizer:
             )
 
             # Calculate category distribution
-            category_distribution = {}
-            for category, time in category_time.items():
-                percentage = time / total_time if total_time > 0 else 0
-                productivity = self.category_productivity.get(category, 0.4)
+            category_distribution: Dict[str, Dict[str, float]] = {}
+            for category, time_spent in category_time.items():
+                percentage = (time_spent / total_time) if total_time > 0 else 0.0
+                productivity = self._weight_for_category(category)
                 category_distribution[category] = {
                     "time_percentage": percentage,
                     "productivity_score": productivity,
@@ -180,7 +166,7 @@ class ActivityCategorizer:
         Returns:
             list: List of suggestions
         """
-        suggestions = []
+        suggestions: List[str] = []
 
         try:
             # Check overall productivity
@@ -193,7 +179,7 @@ class ActivityCategorizer:
 
             # Check entertainment time
             entertainment = category_distribution.get("Entertainment", {})
-            entertainment_time = entertainment.get("time_percentage", 0)
+            entertainment_time = float(entertainment.get("time_percentage", 0) or 0)
             if entertainment_time > 0.3:
                 suggestions.append(
                     "High entertainment time detected. Consider reducing non-work activities"
@@ -201,7 +187,7 @@ class ActivityCategorizer:
 
             # Check development time
             dev = category_distribution.get("Development", {})
-            dev_time = dev.get("time_percentage", 0)
+            dev_time = float(dev.get("time_percentage", 0) or 0)
             if dev_time < 0.3:
                 suggestions.append(
                     "Consider increasing time spent on development tasks"
@@ -209,7 +195,7 @@ class ActivityCategorizer:
 
             # Check communication balance
             comm = category_distribution.get("Communication", {})
-            comm_time = comm.get("time_percentage", 0)
+            comm_time = float(comm.get("time_percentage", 0) or 0)
             if comm_time > 0.4:
                 suggestions.append(
                     "High communication time. Consider setting aside focused work periods"
@@ -221,3 +207,26 @@ class ActivityCategorizer:
         except Exception as e:
             logger.error(f"Error generating suggestions: {e}", exc_info=True)
             return []
+
+    # --- Feedback API ---
+    def set_app_category(self, app_name: str, category: str) -> None:
+        """Override category for a given application name/path (case-insensitive)."""
+        try:
+            if not app_name:
+                return
+            self._overrides[self._basename_lower(app_name)] = category
+            logger.info(f"Set category override of {app_name} -> {category}")
+        except Exception as e:
+            logger.error(f"Error setting app category: {e}")
+
+    def adjust_category_productivity(self, category: str, delta: float) -> None:
+        """Adjust in-memory productivity weight for a category and clamp to [0,1]."""
+        try:
+            current = float(self._weights.get(category, self._default_weight))
+            new_val = max(0.0, min(1.0, current + delta))
+            self._weights[category] = new_val
+            logger.info(
+                f"Adjusted productivity of {category}: {current:.2f} -> {new_val:.2f}"
+            )
+        except Exception as e:
+            logger.error(f"Error adjusting category productivity: {e}")

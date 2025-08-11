@@ -9,6 +9,7 @@ import pandas as pd
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 from ..entities.activity import Activity
+from ..config.categorization_config import CategorizationConfig
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,15 @@ class DataPreprocessor:
         self.time_scaler = MinMaxScaler()
         self.duration_scaler = StandardScaler()
         self.is_fitted = False
+        try:
+            self._cat_config = CategorizationConfig.load()
+        except Exception as e:
+            logger.error(
+                f"Failed to load categorization config in DataPreprocessor: {e}"
+            )
+            self._cat_config = CategorizationConfig(
+                exe_to_category={}, category_weights={}
+            )
 
     def _extract_time_features(self, timestamp: datetime) -> Dict[str, float]:
         """Extract advanced time-based features.
@@ -91,50 +101,13 @@ class DataPreprocessor:
 
         return features
 
-    def _get_app_category(self, app_name: str) -> str:
-        """Get category for application.
+    def _get_app_category(self, executable_or_name: str) -> str:
+        """Get category using config-based mapping only.
 
-        Args:
-            app_name: Application name
-
-        Returns:
-            str: Application category
+        Returns "Unknown" if not mapped.
         """
-        app_lower = app_name.lower()
-
-        # Development tools
-        if any(
-            tool in app_lower
-            for tool in ["code", "studio", "intellij", "pycharm", "eclipse"]
-        ):
-            return "development"
-
-        # Productivity apps
-        if any(
-            app in app_lower
-            for app in [
-                "excel",
-                "word",
-                "powerpoint",
-                "outlook",
-                "teams",
-                "slack",
-                "zoom",
-            ]
-        ):
-            return "productivity"
-
-        # Browsers
-        if any(
-            browser in app_lower for browser in ["chrome", "firefox", "edge", "safari"]
-        ):
-            return "browser"
-
-        # Entertainment
-        if any(app in app_lower for app in ["spotify", "netflix", "vlc", "game"]):
-            return "entertainment"
-
-        return "other"
+        base = (executable_or_name or "").split("\\")[-1].split("/")[-1].lower()
+        return self._cat_config.exe_to_category.get(base, "Unknown")
 
     def _extract_sequence_features(
         self, activities: List[Activity], window_size: int = 5
