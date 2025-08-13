@@ -154,7 +154,3 @@ python src/main.py
 - Workflow optimization suggestions
 
 ---
-
-## 📜 License
-
-This project is open-source under the MIT License.
