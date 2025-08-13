@@ -9,15 +9,8 @@ The AI Work Assistant is a privacy-focused desktop application that helps users 
 
 ## 📸 Screenshots
 
-<table>
-<tr>
-<td><img src="assets/screenshots/Overview.png" alt="Overview" width="300"/></td>
-<td><img src="assets/screenshots/Statistics.png" alt="Statistics" width="300"/></td>
-<td><img src="assets/screenshots/ActivityLog.png" alt="Activity Log" width="300"/></td>
-<td><img src="assets/screenshots/SystemLog.png" alt="System Log" width="300"/></td>
-<td><img src="assets/screenshots/Configuration.png" alt="Configuration" width="300"/></td>
-</tr>
-</table>
+![Slideshow](assets/screenshots/slideshow.gif)
+
 
 
 ## 🔧 Features
