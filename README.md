@@ -12,6 +12,7 @@ The AI Work Assistant is a privacy-focused desktop application that helps users 
 ![Slideshow](assets/screenshots/slideshow.gif)
 
 
+
 ## 🔧 Features
 
 ### 1. Activity Monitoring
